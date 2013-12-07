@@ -1,0 +1,26 @@
+# -*- mode: org -*-
+
+* Parameters
+- number of total Objects
+
+** Time
+- time range
+
+** Type
+
+*** Range Query
+- window size
+
+*** Nearest Neighbors Query
+- number of nearest neighbors
+
+
+* Metrics
+- time per query
+- accuracy
+
+
+* Question
+- how to find the anchor points
+- window size ratio, area or width and height
+- query only integer timestamp
