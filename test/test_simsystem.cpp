@@ -18,6 +18,8 @@ class SimSystemTest : public ::testing::Test {
 
     for (int i = 0; i < num_node - 1; ++i)
       g.add_edge(i, i + 1);
+
+    g.finalize();
   }
 
   static simsys::WalkingGraph g;

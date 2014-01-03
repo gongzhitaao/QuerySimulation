@@ -12,43 +12,6 @@
 
 namespace simsys {
 
-using namespace std;
-using namespace boost;
-
-struct found_goal {};
-
-template <typename Vertex>
-class astar_goal_visitor : public default_astar_visitor
-{
- public:
-  astar_goal_visitor(Vertex goal) : goal_(goal) {}
-
-  template <typename Graph>
-  void examine_vertex(Vertex &u, const Graph &g) {
-    if (u == goal_) throw found_goal();
-  }
- private:
-  Vertex goal_;
-};
-
-template<typename Graph, typename CoordMap>
-class heuristic : public astar_heuristic<Graph, double>
-{
- public:
-  typedef typename graph_traits<Graph>::vertex_descriptor Vertex;
-
-  heuristic(Vertex &goal, const CoordMap &coord)
-      :  goal_(goal), coord_(coord) {}
-
-  double operator()(Vertex u) {
-    return std::sqrt(CGAL::squared_distance(coord_[goal_], coord_[u]));
-  }
-
- private:
-  Vertex goal_;
-  const CoordMap &coord_;
-};
-
 void SimSystem::run(const WalkingGraph *wg, double duration, int num_object)
 {
   records_.clear();

@@ -1,4 +1,0 @@
-simsystem
-=========
-
-Indoor simulation system
