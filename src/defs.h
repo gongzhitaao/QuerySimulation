@@ -1,18 +1,27 @@
 #ifndef SRC_DEFS_H_
 #define SRC_DEFS_H_
 
-#include <vector>
+#pragma once
 
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <vector>
 
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
+
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Range_segment_tree_traits.h>
+#include <CGAL/Range_tree_k.h>
 
 namespace simsys {
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef K::Point_2 Point_2;
 typedef K::Circle_2 Circle_2;
+
+typedef CGAL::Range_tree_map_traits_2<K, int> Traits;
+typedef CGAL::Range_tree_2<Traits> RangeTree_2;
+typedef Traits::Key Node;
+typedef Traits::Interval Window;
 
 enum vertex_color_enum { ROOM, DOOR, HALL, VERTEX_COLOR_ENUM };
 
@@ -37,10 +46,9 @@ typedef boost::graph_traits<UndirectedGraph>::edge_descriptor Edge;
 typedef boost::property_map<UndirectedGraph, boost::vertex_color_t>::type ColorMap;
 typedef boost::property_map<UndirectedGraph, vertex_coord_t>::type CoordMap;
 typedef boost::property_map<UndirectedGraph, boost::edge_weight_t>::type WeightMap;
-typedef boost::property_map<UndirectedGraph, edge_anchor_t>::type AnchorMap;
 
 // Pair: (timestamp, <x, y>)
-typedef std::vector<std::pair<double, Point_2> > trace_t;
+typedef std::vector<std::pair<double, Point_2> > Trace;
 
 }
 

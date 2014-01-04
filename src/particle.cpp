@@ -5,19 +5,19 @@
 #include <boost/random/normal_distribution.hpp>
 
 #include "particle.h"
-
 #include "walkinggraph.h"
 
-Point_2 linear_interpolate(const Point_2 &p1, const Point_2 &p2, double r)
+namespace simsys {
+
+inline Point_2 linear_interpolate(const Point_2 &p1, const Point_2 &p2, double r)
 {
   return p1 + (p2 - p1) * r;
 }
 
 const double Particle::TimeUnit = 1.0;
 
-Particle::Particle(const WalkingGraph *wg)
+Particle::Particle(const WalkingGraph &g)
 {
-  const WalkingGraph &g = *wg;
   boost::random::mt19937 gen(time(0));
 
   // Human average walking speed ranging roughly from 4.5 to 5.4 km/h
@@ -31,11 +31,11 @@ Particle::Particle(const WalkingGraph *wg)
   boost::random::uniform_real_distribution<> unifd(0, 1);
   double p_ = unifd(gen);
 
-  double pre_elapsed = g.weights()[*it] * p_ / velocity_;
+  double pre_elapsed = g.weights()[boost::edge(source_, target_, g()).first] * p_ / velocity_;
   history_.push_back(std::make_pair(-pre_elapsed, source_));
 }
 
-Vertex random_next(Vertex v, const WalkingGraph &g) const
+Vertex Particle::random_next(Vertex v, const WalkingGraph &g) const
 {
   boost::random::mt19937 gen(time(0));
   boost::random::uniform_int_distribution<> unifi(0, boost::in_degree(v, g()) - 1);
@@ -61,10 +61,10 @@ class astar_goal_visitor : public boost::default_astar_visitor
 };
 
 template<typename Graph, typename CoordMap>
-class heuristic : public astar_heuristic<Graph, double>
+class heuristic : public boost::astar_heuristic<Graph, double>
 {
  public:
-  typedef typename graph_traits<Graph>::vertex_descriptor Vertex;
+  typedef typename boost::graph_traits<Graph>::vertex_descriptor Vertex;
 
   heuristic(Vertex &goal, const CoordMap &coord)
       :  goal_(goal), coord_(coord) {}
@@ -78,16 +78,14 @@ class heuristic : public astar_heuristic<Graph, double>
   const CoordMap &coord_;
 };
 
-Point_2 Particle::advance(const WalkingGraph *wg, double t)
+Point_2 Particle::advance(const WalkingGraph &g, double t)
 {
-  const WalkingGraph &g = *wg;
-
   if (t <= 0) {
     // Particle advances for a unit of time and may not go backwards
     // unless there is a deadend.
 
     double elapsed = history_.back().first;
-    double left = (1 - p_) * g.weights()[boost::edge(source_, target_, g())];
+    double left = (1 - p_) * g.weights()[boost::edge(source_, target_, g()).first];
     double dist = velocity_ * TimeUnit;
 
     dist -= left;
@@ -97,12 +95,12 @@ Point_2 Particle::advance(const WalkingGraph *wg, double t)
       history_.push_back(std::make_pair(elapsed, source_));
 
       source_ = target_;
-      target_ = random_next(source_);
-      left = g.weights()[boost::edge(source_, target_, g())];
+      target_ = random_next(source_, g);
+      left = g.weights()[boost::edge(source_, target_, g()).first];
       dist -= left;
     }
 
-    p_ = 1 + dist / g.weights()[boost::edge(source_, target_, g())];
+    p_ = 1 + dist / g.weights()[boost::edge(source_, target_, g()).first];
 
   } else {
     // Particle advances for a period of time set by the user, during
@@ -111,19 +109,24 @@ Point_2 Particle::advance(const WalkingGraph *wg, double t)
     // will repeat the above process till it runs out of time.  This
     // is slightly different than the *t < 0* case.
 
+    boost::random::mt19937 gen(time(0));
     double pre_elapsed = history_.back().first;
-    double elapsed = (1 - p_) * g.weights()[boost::edge(source_, target_, g())] / velocity_;
+    double elapsed = (1 - p_) * g.weights()[boost::edge(source_, target_, g()).first] / velocity_;
+
+    std::vector<Vertex> p(num_vertices(g()));
+    std::vector<double> d(num_vertices(g()));
 
     while (elapsed < t) {
       Vertex goal = boost::random_vertex(g(), gen);
       astar_goal_visitor<Vertex> visitor(source_);
       try {
-        boost::astar_search(g(), goal, boost::heuristic<UndirectedGraph, CoordMap>(goal, g.coords()),
-                            boost::predecessor_map(boost::make_iterator_property_map(
-                                p.begin(), get(vertex_index, g()))).
-                            distance_map(boost::make_iterator_property_map(
-                                d.begin(), get(vertex_index, g()))).
-                            visitor(visitor));
+        boost::astar_search(
+            g(), goal, heuristic<UndirectedGraph, CoordMap>(goal, g.coords()),
+            boost::predecessor_map(boost::make_iterator_property_map(
+                p.begin(), boost::get(boost::vertex_index, g()))).
+            distance_map(boost::make_iterator_property_map(
+                d.begin(), boost::get(boost::vertex_index, g()))).
+            visitor(visitor));
       } catch (found_goal fg) {
         for (Vertex u = source_, v; u != p[u] && elapsed < t; u = p[u]) {
           v = p[u];
@@ -137,15 +140,17 @@ Point_2 Particle::advance(const WalkingGraph *wg, double t)
         }
       }
     }
-    p_ = (elapsed - t) * velocity_ / g.weights()[boost::edge(source_, target_)];
+
+    p_ = (elapsed - t) * velocity_ / g.weights()[boost::edge(source_, target_, g()).first];
+
   }
 
   return linear_interpolate(g.coords()[source_], g.coords()[target_], p_);
+
 }
 
-Point_2 Particle::pos(const WalkingGraph *wg, double t) const
+Point_2 Particle::pos(const WalkingGraph &g, double t) const
 {
-  const WalkingGraph &g = *wg;
   Point_2 p1, p2;
   double ratio;
 
@@ -173,12 +178,13 @@ Point_2 Particle::pos(const WalkingGraph *wg, double t) const
   return linear_interpolate(p1, p2, ratio);
 }
 
-trace_t Particle::pos(const WalkingGraph *wg,
-                      double start, double duration, int count) const
+Trace Particle::pos(const WalkingGraph &g, double start, double duration, int count) const
 {
   double step = duration / count;
-  trace_t res;
+  Trace res;
   for (int i = 0; i < count; ++i)
-    res.push_back(pos(wg, start + i * step));
+    res.push_back(std::make_pair(start + i * step, pos(g, start + i * step)));
   return res;
+}
+
 }

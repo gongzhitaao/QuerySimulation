@@ -9,9 +9,6 @@
 
 #include "defs.h"
 
-#include <CGAL/Range_segment_tree_traits.h>
-#include <CGAL/Range_tree_k.h>
-
 namespace simsys {
 
 class WalkingGraph
@@ -21,9 +18,14 @@ class WalkingGraph
   typedef Traits::Key Key;
   typedef Traits::Interval Interval;
 
+  struct Segment {
+    Vertex source, target;
+    double p, r;
+  };
+
   struct Reader {
     Circle_2 r;
-    std::vector<index_t> segments;
+    std::vector<Segment> segments;
   };
 
  public:
@@ -53,29 +55,17 @@ class WalkingGraph
   void add_reader(double x, double y, double r) {
     Reader rd;
     rd.r = Circle_2(Point_2(x, y), r);
-    rd.segments = std::vector<index_t>();
+    rd.segments = std::vector<Segment>();
     readers_.push_back(rd);
   }
 
   void finalize() {
     std::vector<Key> vec;
-    for (std::map<int, Vertex>::const_iterator it = vertices_.begin(); it != vertices_.end(); ++it)
+
+    range_tree_t verts;
+    for (auto it = vertices_.cbegin(); it != vertices_.cend(); ++it)
       vec.push_back(Key(coords_[it->second], it->first));
-    v_.make_tree(vec.begin(), vec.end());
-
-    vec.clear();
-    for (size_t i = 0; i < readers_.size(); ++i) {
-      const Reader &r = readers_[i];
-      vec.push_back(Key(r.r.center(), i));
-
-      double x = r.r.center().x(),
-             y = r.r.center().y(),
-           rad = std::sqrt(r.r.squared_radius());
-      Interval win(Point_2(x - rad, x + rad), Point_2(y - rad, y + rad));
-      std::vector<Key> res;
-      v_.window_query(win, std::back_inserter(res));
-    }
-    r_.make_tree(vec.begin(), vec.end());
+    verts.make_tree(vec.begin(), vec.end());
   }
 
   const UndirectedGraph &operator() () const { return g_; }
@@ -91,9 +81,6 @@ class WalkingGraph
 
   std::map<int, Vertex> vertices_;
   std::vector<Reader> readers_;
-
-  // vertices
-  range_tree_t v_;
 
   // readers
   range_tree_t r_;
