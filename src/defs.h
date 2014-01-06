@@ -23,7 +23,7 @@ typedef CGAL::Range_tree_2<Traits> RangeTree_2;
 typedef Traits::Key Node;
 typedef Traits::Interval Window;
 
-enum vertex_color_enum { ROOM, DOOR, HALL, VERTEX_COLOR_ENUM };
+enum vertex_color_enum { HALL, DOOR, ROOM, VERTEX_COLOR_ENUM };
 
 struct vertex_coord_t { typedef boost::vertex_property_tag kind; };
 typedef boost::property<vertex_coord_t, Point_2> CoordProperty;

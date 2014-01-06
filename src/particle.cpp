@@ -32,6 +32,7 @@ Particle::Particle(const WalkingGraph &g)
   double p_ = unifd(gen);
 
   double pre_elapsed = g.weights()[boost::edge(source_, target_, g()).first] * p_ / velocity_;
+
   history_.push_back(std::make_pair(-pre_elapsed, source_));
 }
 

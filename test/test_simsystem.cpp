@@ -23,11 +23,9 @@ class SimSystemTest : public ::testing::Test {
   }
 
   static simsys::WalkingGraph g;
-  static simsys::SimSystem sim;
 };
 
 simsys::WalkingGraph SimSystemTest::g;
-simsys::SimSystem SimSystemTest::sim;
 
 int main(int argc, char** argv) {
   ::testing::GTEST_FLAG(filter) = "";

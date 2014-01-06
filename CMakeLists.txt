@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED (VERSION 2.8)
 
 project (demo)
 
-OPTION(build_test "Build SimSystem test cases." ON)
+OPTION(build_test "Build SimSystem test cases." OFF)
 
 SET (CMAKE_CXX_FLAGS "-frounding-math -Wall -std=c++11 -O3")
 SET (CMAKE_CXX_FLAGS_DEBUG "-frounding-math -Wall -std=c++11 -g")
