@@ -1,48 +1,32 @@
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <vector>
 #include <iostream>
 
-#include "simsystem.h"
+#include "walkinggraph.h"
 
 using namespace std;
 
 class SimSystemTest : public ::testing::Test {
  protected:
-  virtual void SetUp() {
+  static void SetUpTestCase() {
     const int num_node = 10;
     for (int i = 0; i < num_node; ++i)
-      sim.add_node(i, 0, i, simsys::SimSystem::HALL);
+      g.add_vertex(i, 0, i);
 
     for (int i = 0; i < num_node - 1; ++i)
-      sim.add_edge(i, i + 1);;
+      g.add_edge(i, i + 1);
   }
 
-  simsys::SimSystem sim;
+  static simsys::WalkingGraph g;
 };
 
-TEST_F(SimSystemTest, run)
-{
-  sim.run(1, 1);
-  sim.save_trace("test.txt");
-}
+simsys::WalkingGraph SimSystemTest::g;
 
-TEST_F(SimSystemTest, snapshot0)
-{
-  sim.run(20, 3);
-  double t = 0.5;
-  vector<simsys::Vec3> result = sim.get_snapshot(t);
-  for (unsigned i = 0; i < result.size(); ++i)
-    cout << result[i].x << ' ' << result[i].y << ' ' << result[i].t << endl;
-}
-
-TEST_F(SimSystemTest, snapshot1)
-{
-  sim.run(20, 3);
-  vector<simsys::trace> result = sim.get_snapshot(2, 4, 0.5);
-  for (unsigned i = 0; i < result.size(); ++i) {
-    for (unsigned j = 0; j < result[i].size(); ++j)
-      cout << result[i][j].x << ' ' << result[i][j].y << ' ' << result[i][j].t << endl;
-    cout << "====" << endl;
-  }
+int main(int argc, char** argv) {
+  ::testing::GTEST_FLAG(filter) = "";
+  // This allows the user to override the flag on the command line.
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
