@@ -6,5 +6,6 @@ target_link_libraries(test_simsystem CGAL CGAL_Core)
 target_link_libraries(test_simsystem gmp)
 target_link_libraries(test_simsystem pthread)
 target_link_libraries(test_simsystem particle)
+target_link_libraries(test_simsystem walkinggraph)
 
 add_test(test-simsystem test_simsystem)

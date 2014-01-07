@@ -5,9 +5,12 @@
 #include <boost/random/normal_distribution.hpp>
 
 #include "particle.h"
-#include "walkinggraph.h"
+
+#include <iostream>
 
 namespace simsys {
+
+extern boost::random::mt19937 gen;
 
 inline Point_2 linear_interpolate(const Point_2 &p1, const Point_2 &p2, double r)
 {
@@ -16,13 +19,12 @@ inline Point_2 linear_interpolate(const Point_2 &p1, const Point_2 &p2, double r
 
 const double Particle::TimeUnit = 1.0;
 
-Particle::Particle(const WalkingGraph &g)
+Particle::Particle(const WalkingGraph &g, int id, int reader)
+    : id_(id)
 {
-  boost::random::mt19937 gen(time(0));
-
   // Human average walking speed ranging roughly from 4.5 to 5.4 km/h
   // See: https://en.wikipedia.org/wiki/Walking
-  boost::random::normal_distribution<> norm(1.5, 0.3);
+  boost::random::normal_distribution<> norm(1.5, 0.2);
   velocity_ = norm(gen);
 
   target_ = boost::random_vertex(g(), gen);
@@ -38,7 +40,6 @@ Particle::Particle(const WalkingGraph &g)
 
 Vertex Particle::random_next(Vertex v, const WalkingGraph &g) const
 {
-  boost::random::mt19937 gen(time(0));
   boost::random::uniform_int_distribution<> unifi(0, boost::in_degree(v, g()) - 1);
   boost::graph_traits<UndirectedGraph>::in_edge_iterator it =
       boost::next((boost::in_edges(target_, g())).first, unifi(gen));
@@ -110,7 +111,6 @@ Point_2 Particle::advance(const WalkingGraph &g, double t)
     // will repeat the above process till it runs out of time.  This
     // is slightly different than the *t < 0* case.
 
-    boost::random::mt19937 gen(time(0));
     double pre_elapsed = history_.back().first;
     double elapsed = (1 - p_) * g.weights()[boost::edge(source_, target_, g()).first] / velocity_;
 
@@ -134,7 +134,7 @@ Point_2 Particle::advance(const WalkingGraph &g, double t)
           Edge e = edge(u, v, g()).first;
           double dist = g.weights()[e];
           elapsed += dist / velocity_;
-          history_.push_back(std::make_pair(elapsed + pre_elapsed, u));
+          history_.push_back(std::make_pair(elapsed + pre_elapsed, v));
 
           source_ = u;
           target_ = v;
@@ -186,6 +186,13 @@ Trace Particle::pos(const WalkingGraph &g, double start, double duration, int co
   for (int i = 0; i < count; ++i)
     res.push_back(std::make_pair(start + i * step, pos(g, start + i * step)));
   return res;
+}
+
+void Particle::print(const WalkingGraph &g) const
+{
+  for (size_t i = 0; i < history_.size(); ++i)
+    std::cout << history_[i].first << ' ' << g.indices()[history_[i].second] << std::endl;
+  std::cout << std::endl;
 }
 
 }
