@@ -4,8 +4,6 @@
 
 namespace simsys {
 
-int WalkingGraph::anchor_id = 0;
-
 WalkingGraph::WalkingGraph()
     : g_(UndirectedGraph())
     , vertindices_(boost::get(boost::vertex_index1, g_))
@@ -25,12 +23,13 @@ void WalkingGraph::add_vertex(int id, double x, double y, vertex_color_enum c)
   vertindices_[u] = id;
 }
 
-void WalkingGraph::add_edge(int src, int des)
+std::pair<Point_2, Point_2> WalkingGraph::add_edge(int src, int des)
 {
   Vertex u = vertices_[src];
   Vertex v = vertices_[des];
   Edge e = boost::add_edge(u, v, g_).first;
   weights_[e] = std::sqrt(CGAL::squared_distance(coords_[u], coords_[v]));
+  return std::make_pair(coords_[u], coords_[v]);
 }
 
 void WalkingGraph::add_reader(double x, double y, int v1, int v2)
@@ -48,12 +47,15 @@ void WalkingGraph::build_index()
 {
   std::vector<Node> inputs;
   for (size_t i = 0; i < readers_.size(); ++i)
-    inputs.push_back(Node(readers_[i].center, i + 1));
+    inputs.push_back(Node(readers_[i].center, i));
   readertree_.make_tree(inputs.begin(), inputs.end());
 }
 
-int WalkingGraph::detected(const Point_2 &p, double r)
+int WalkingGraph::detected(const Point_2 &p, double r, int id)
 {
+  if (id > 0)
+    return CGAL::squared_distance(p, readers_[id - 1].center) <= r * r ? id - 1 : -1;
+
   double rx = r + 0.1;
   Window win(Point_2(p.x() - rx, p.y() - rx), Point_2(p.x() + rx, p.y() + rx));
   std::vector<Node> result;
@@ -61,8 +63,11 @@ int WalkingGraph::detected(const Point_2 &p, double r)
 
   // There is at most one element, if any, in the result set since
   // readers' detection ranges don't overlap.
-  if (result.size() > 0)
-    return result[0].second;
+  for (size_t i = 0; i < result.size(); ++i) {
+    int id = result[i].second;
+    if (CGAL::squared_distance(p, readers_[id].center) <= r * r)
+      return id + 1;
+  }
 
   return -1;
 }

@@ -17,20 +17,23 @@ typedef std::vector<std::pair<double, Point_2> > Trace;
 class Particle
 {
  public:
-  Particle(const WalkingGraph &g, int id = -1, int reader = -1);
+  Particle(const WalkingGraph &g, int id = -1, double radius = -1.0, int reader = -1);
 
   Point_2 advance(const WalkingGraph &g, double t = -1);
   Point_2 pos(const WalkingGraph &g, double t = -1) const;
   Trace pos(const WalkingGraph &g, double start, double duration, int count) const;
+
+  static void set_unit(double unit) { unit_ = unit; }
+  static double get_unit() { return unit_; }
 
   void print(const WalkingGraph &g) const;
 
   const int id() const { return id_; }
 
  private:
-  Vertex random_next(Vertex v, const WalkingGraph &g) const;
+  Vertex random_next(const Vertex v, const WalkingGraph &g, const Vertex u = NullVertex) const;
 
-  static const double TimeUnit;
+  static double unit_;
 
   Vertex source_;
   Vertex target_;
