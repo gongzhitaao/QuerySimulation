@@ -2,6 +2,7 @@
 
 namespace simsys {
 
-boost::random::mt19937 gen;
+std::random_device rd;
+boost::random::mt19937 gen(rd());
 
 }
