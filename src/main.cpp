@@ -16,8 +16,8 @@ extern boost::random::mt19937 gen;
 
 const double DURATION   = 100.0; // length of simulation
 const double HIT_RATE   = 0.95;  // probability of an object in detection range being detected
-const int NUM_OBJECT    = 1; // number of moving objects under observation
-const int NUM_PARTICLE  = 32;    // number of sub-particles each object generate
+const int NUM_OBJECT    = 1;     // number of moving objects under observation
+const int NUM_PARTICLE  = 128;   // number of sub-particles each object generate
 const int NUM_SNAPSHOTS = 10;    // number of timestamps to query
 const double RADIUS     = 2.0;   // detection range of RFID readers
 const double RATE       = 1.0;   // reader's reading rate, i.e. reading per second
@@ -53,18 +53,28 @@ std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
   return readings;
 }
 
-bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading, double t, Anchor &anchors, int limit = 2)
+bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
+             double t, Anchor &anchors, int limit = 2)
 {
-  // Up to *end*, we have readings for this object.
+  // The number of valid readings, i.e. reading >= 0, in [start, end]
+  // is *limit*.
   int end = t * RATE;
-  int start = end + 1;
+  int start = end;
   {
+    int last = -1;
     int count = 0;
-    for (/* empty */; count < limit && start >= 0; /* empty */)
-      if (reading[--start] >= 0) ++count;
+    for (/* empty */; count < limit && start >= 0; --start) {
+      if (reading[start] >= 0 && reading[start] != last) {
+        ++count;
+        last = reading[start];
+      }
+    }
 
     // Not enough observation
     if (count < limit) return false;
+
+    // The last decrement is uncalled for.
+    ++start;
   }
 
   // Initialize subparticles
@@ -76,10 +86,11 @@ bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading, d
   // the reader.  This is NOT particle filter, just an extention of
   // symbolic model IMO.
   for (int i = start + 1; i <= end; ++i) {
-    for (auto it = subparticles.begin(); it != subparticles.end(); ++it) {
+    for (auto it = subparticles.begin(); it != subparticles.end(); /* empt */) {
       simsys::Point_2 p = it->advance(g);
       if (reading[i] >= 0 && g.detected(p, RADIUS, reading[i]) < 0)
-        subparticles.erase(it);
+        it = subparticles.erase(it);
+      else ++it;
     }
   }
 
@@ -176,6 +187,7 @@ int main()
   //   std::cout << std::endl;
   // }
 
+  // Align subparticles to anchor points.
   Anchor anchors;
   {
     boost::random::uniform_real_distribution<> unifd(50.0, DURATION);

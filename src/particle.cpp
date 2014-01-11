@@ -30,7 +30,7 @@ Particle::Particle(const WalkingGraph &g, int id, double radius, int reader)
   boost::random::uniform_real_distribution<> unifd(0, 1);
 
   if (reader >= 0) {
-    const Reader &rd = g.reader(reader);
+    const Reader &rd = g.reader(reader - 1);
     if (unifd(gen) > 0.5) {
       target_ = rd.target;
       source_ = rd.source;
