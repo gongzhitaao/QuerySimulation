@@ -17,9 +17,9 @@ inline Point_2 linear_interpolate(const Point_2 &p1, const Point_2 &p2, double r
   return p1 + (p2 - p1) * r;
 }
 
-const double Particle::TimeUnit = 1.0;
+double Particle::unit_ = 1.0;
 
-Particle::Particle(const WalkingGraph &g, int id, int reader)
+Particle::Particle(const WalkingGraph &g, int id, double radius, int reader)
     : id_(id)
 {
   // Human average walking speed ranging roughly from 4.5 to 5.4 km/h
@@ -27,23 +27,49 @@ Particle::Particle(const WalkingGraph &g, int id, int reader)
   boost::random::normal_distribution<> norm(1.5, 0.2);
   velocity_ = norm(gen);
 
-  target_ = boost::random_vertex(g(), gen);
-  source_ = random_next(target_, g);
-
   boost::random::uniform_real_distribution<> unifd(0, 1);
-  double p_ = unifd(gen);
+
+  if (reader >= 0) {
+    const Reader &rd = g.reader(reader);
+    if (unifd(gen) > 0.5) {
+      target_ = rd.target;
+      source_ = rd.source;
+      p_ = rd.ratio;
+    } else {
+      target_ = rd.source;
+      source_ = rd.target;
+      p_ = 1 - rd.ratio;
+    }
+  } else {
+    target_ = boost::random_vertex(g(), gen);
+    source_ = random_next(target_, g);
+    p_ = unifd(gen);
+  }
 
   double pre_elapsed = g.weights()[boost::edge(source_, target_, g()).first] * p_ / velocity_;
-
   history_.push_back(std::make_pair(-pre_elapsed, source_));
+
+  if (reader >= 0)
+    advance(g, unifd(gen) * radius / velocity_);
 }
 
-Vertex Particle::random_next(Vertex v, const WalkingGraph &g) const
+// Randomly choose next vertex to advance to.  If u which is where the
+// particle came from is present, then the randomly chosen vertex may
+// not be u unless the out degree of v is only one in which we have no
+// choice.  In this way, the particle preserves its direction.
+Vertex Particle::random_next(const Vertex v, const WalkingGraph &g, const Vertex u) const
 {
-  boost::random::uniform_int_distribution<> unifi(0, boost::in_degree(v, g()) - 1);
-  boost::graph_traits<UndirectedGraph>::in_edge_iterator it =
-      boost::next((boost::in_edges(target_, g())).first, unifi(gen));
-  return boost::source(*it, g());
+  int outdegree = boost::out_degree(v, g());
+  boost::random::uniform_int_distribution<> unifi(0, outdegree - 1);
+  Vertex target = NullVertex;
+  {
+    boost::graph_traits<UndirectedGraph>::out_edge_iterator it;
+    do {
+      it = boost::next(boost::out_edges(v, g()).first, unifi(gen));
+      target = boost::target(*it, g());
+    } while (outdegree > 1 && u == target);
+  }
+  return target;
 }
 
 struct found_goal {};
@@ -88,7 +114,7 @@ Point_2 Particle::advance(const WalkingGraph &g, double t)
 
     double elapsed = history_.back().first;
     double left = (1 - p_) * g.weights()[boost::edge(source_, target_, g()).first];
-    double dist = velocity_ * TimeUnit;
+    double dist = velocity_ * unit_;
 
     dist -= left;
 
