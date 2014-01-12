@@ -20,7 +20,7 @@ typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef K::Point_2 Point_2;
 typedef K::Circle_2 Circle_2;
 typedef K::Vector_2 Vector_2;
-typedef K::Line_2 Line_2;
+typedef CGAL::Iso_rectangle_2<K> IsoRect_2;
 
 enum vertex_color_enum { HALL, DOOR, ROOM, VERTEX_COLOR_ENUM };
 
@@ -48,22 +48,32 @@ struct Reader {
   double ratio;
 };
 
+inline std::pair<int, int> key(const simsys::Point_2 p, double unit)
+{
+  return std::make_pair((int)(p.x() / unit), (int)(p.y() / unit));
+}
+
 class WalkingGraph
 {
-  typedef CGAL::Range_tree_map_traits_2<K, int> Traits;
-  typedef CGAL::Range_tree_2<Traits> RangeTree_2;
-  typedef Traits::Key Node;
-  typedef Traits::Interval Window;
+  typedef CGAL::Range_tree_map_traits_2<K, int> ReaderTraits;
+  typedef CGAL::Range_tree_2<ReaderTraits> ReaderTree;
+
+  typedef CGAL::Range_tree_map_traits_2<K, std::pair<int, int> > AnchorTraits;
+  typedef CGAL::Range_tree_2<AnchorTraits> AnchorTree;
 
  public:
   WalkingGraph();
 
   void add_vertex(int id, double x, double y, vertex_color_enum c = HALL);
-  std::pair<Point_2, Point_2> add_edge(int src, int des);
+  void add_edge(int src, int des);
   void add_reader(double x, double y, int v1, int v2);
-  void build_index();
+  void add_room(double x0, double y0, double x1, double y1, int node);
+  void add_hall(double x0, double y0, double x1, double y1, int dir);
 
+  void build_index(double unit);
   int detected(const Point_2 &p, double r, int id = -1);
+
+  IsoRect_2 random_window(double ratio) const;
 
   UndirectedGraph &operator() () { return g_; }
   const UndirectedGraph &operator() () const { return g_; }
@@ -83,8 +93,13 @@ class WalkingGraph
 
   std::map<int, Vertex> vertices_;
   std::vector<Reader> readers_;
+  std::vector<std::pair<IsoRect_2, Vertex> > rooms_;
+  std::vector<std::pair<IsoRect_2, int> > halls_;
 
-  RangeTree_2 readertree_;
+  ReaderTree readertree_;
+  AnchorTree anchortree_;
+
+  double xmax_, ymax_;
 };
 
 }

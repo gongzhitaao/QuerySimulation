@@ -21,19 +21,9 @@ const int NUM_PARTICLE  = 128;   // number of sub-particles each object generate
 const int NUM_SNAPSHOTS = 10;    // number of timestamps to query
 const double RADIUS     = 2.0;   // detection range of RFID readers
 const double RATE       = 1.0;   // reader's reading rate, i.e. reading per second
-const double UNIT_LENGH = 1.0;   // distance between anchor points along each axis.
-
-typedef CGAL::Range_tree_map_traits_2<simsys::K, std::pair<int, int> > Traits;
-typedef CGAL::Range_tree_2<Traits> RangeTree_2;
-typedef Traits::Key Node;
-typedef Traits::Interval Window;
+const double UNIT_LENGTH = 1.0;   // distance between anchor points along each axis.
 
 typedef std::map<std::pair<int, int>, std::map<int, double> > Anchor;
-
-inline std::pair<int, int> key(const simsys::Point_2 p)
-{
-  return std::make_pair((int)(p.x() / UNIT_LENGH), (int)(p.y() / UNIT_LENGH));
-}
 
 // Generate readings for each objects
 std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
@@ -100,7 +90,7 @@ bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
   int total = subparticles.size();
   for (auto it = subparticles.begin(); it != subparticles.end(); ++it) {
     simsys::Point_2 p = it->advance(g, remain);
-    anchors[key(p)][id] += 1.0 / total;
+    anchors[simsys::key(p, UNIT_LENGTH)][id] += 1.0 / total;
   }
 
   return true;
@@ -110,8 +100,6 @@ int main()
 {
   // number of readings
   const int NUM_READING = (int) (DURATION * RATE);
-  const simsys::Line_2 Horizontal(simsys::Point_2(0, 0), simsys::Point_2(UNIT_LENGH, 0));
-  const simsys::Line_2 Vertical(simsys::Point_2(0, 0), simsys::Point_2(0, UNIT_LENGH));
 
   simsys::WalkingGraph g;
 
@@ -128,32 +116,11 @@ int main()
   // Read in edge for walking graph and construct anchor points.
   // Anchor points are constructed based on the assumption that
   // walking graph edge is parallel to X or Y axis.
-  RangeTree_2 anchortree;
   {
     std::ifstream fin("../data/edge.txt");
     int v1, v2;
-    std::vector<Node> inputs;
-    while (fin >> v1 >> v2) {
-      simsys::Point_2 start, end;
-      boost::tie(start, end) = g.add_edge(v1, v2);
-      simsys::Vector_2 v = end - start;
-      if (CGAL::parallel(simsys::Line_2(simsys::Point_2(0, 0), v), Vertical)) {
-        int y0 = std::ceil(start.y() / UNIT_LENGH);
-        int count = (end.y() - y0 * UNIT_LENGH) / UNIT_LENGH;
-        for (int dy = 0; dy < count; ++dy) {
-          simsys::Point_2 p = simsys::Point_2(start.x(), y0 + dy * UNIT_LENGH);
-          inputs.push_back(Node(p, key(p)));
-        }
-      } else {
-        int x0 = std::ceil(start.x() / UNIT_LENGH);
-        int count = (end.x() - x0 * UNIT_LENGH) / UNIT_LENGH;
-        for (int dx = 0; dx < count; ++dx) {
-          simsys::Point_2 p = simsys::Point_2(x0 + dx * UNIT_LENGH, start.y());
-          inputs.push_back(Node(p, key(p)));
-        }
-      }
-      anchortree.make_tree(inputs.begin(), inputs.end());
-    }
+    while (fin >> v1 >> v2)
+      g.add_edge(v1, v2);
     fin.close();
   }
 
@@ -167,7 +134,27 @@ int main()
     fin.close();
   }
 
-  g.build_index();
+  // Read in rooms configuration.
+  {
+    std::ifstream fin("../data/room.txt");
+    double x0, y0, x1, y1;
+    int id, vertex;
+    while (fin >> id >> x0 >> y0 >> x1 >> y1 >> vertex)
+      g.add_room(x0, y0, x1, y1, vertex);
+    fin.close();
+  }
+
+  // Read in halls configuration
+  {
+    std::ifstream fin("../data/hall.txt");
+    double x0, y0, x1, y1;
+    int dir;
+    while (fin >> x0 >> y0 >> x1 >> y1 >> dir)
+      g.add_hall(x0, y0, x1, y1, dir);
+    fin.close();
+  }
+
+  g.build_index(UNIT_LENGTH);
 
   // Initialize and run each particle along the graph for *DURATION*.
   simsys::Particle::set_unit(1.0 / RATE);
@@ -194,6 +181,9 @@ int main()
     double time = unifd(gen);
     for (int i = 0; i < NUM_OBJECT; ++i)
       predict(g, i, readings[i], time, anchors);
+
+    simsys::IsoRect_2 win = g.random_window(0.2);
+    // std::cout << win << std::endl;
   }
 
   return 0;
