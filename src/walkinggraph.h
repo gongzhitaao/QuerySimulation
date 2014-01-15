@@ -42,6 +42,10 @@ typedef boost::property_map<UndirectedGraph, boost::vertex_color_t>::type ColorM
 typedef boost::property_map<UndirectedGraph, vertex_coord_t>::type CoordMap;
 typedef boost::property_map<UndirectedGraph, boost::edge_weight_t>::type WeightMap;
 
+typedef CGAL::Range_tree_map_traits_2<K, std::pair<int, int> > AnchorTraits;
+typedef CGAL::Range_tree_2<AnchorTraits> AnchorTree;
+typedef AnchorTraits::Key AnchorKey;
+
 struct Reader {
   Point_2 center;
   Vertex source, target;
@@ -58,22 +62,15 @@ class WalkingGraph
   typedef CGAL::Range_tree_map_traits_2<K, int> ReaderTraits;
   typedef CGAL::Range_tree_2<ReaderTraits> ReaderTree;
 
-  typedef CGAL::Range_tree_map_traits_2<K, std::pair<int, int> > AnchorTraits;
-  typedef CGAL::Range_tree_2<AnchorTraits> AnchorTree;
-
  public:
   WalkingGraph();
 
   void add_vertex(int id, double x, double y, vertex_color_enum c = HALL);
   void add_edge(int src, int des);
   void add_reader(double x, double y, int v1, int v2);
-  void add_room(double x0, double y0, double x1, double y1, int node);
-  void add_hall(double x0, double y0, double x1, double y1, int dir);
 
   void build_index(double unit);
   int detected(const Point_2 &p, double r, int id = -1);
-
-  IsoRect_2 random_window(double ratio) const;
 
   UndirectedGraph &operator() () { return g_; }
   const UndirectedGraph &operator() () const { return g_; }
@@ -82,6 +79,7 @@ class WalkingGraph
   const CoordMap &coords() const { return coords_; }
   const WeightMap &weights() const { return weights_; }
   const Reader &reader(int i) const { return readers_[i]; }
+  AnchorTree &anchortree() { return anchortree_; }
 
  private:
   UndirectedGraph g_;
@@ -93,13 +91,9 @@ class WalkingGraph
 
   std::map<int, Vertex> vertices_;
   std::vector<Reader> readers_;
-  std::vector<std::pair<IsoRect_2, Vertex> > rooms_;
-  std::vector<std::pair<IsoRect_2, int> > halls_;
 
   ReaderTree readertree_;
   AnchorTree anchortree_;
-
-  double xmax_, ymax_;
 };
 
 }

@@ -1,14 +1,8 @@
 #include <cmath>
-#include <limits>
-
-#include <boost/random.hpp>
-#include <boost/random/normal_distribution.hpp>
 
 #include "walkinggraph.h"
 
 namespace simsys {
-
-extern boost::random::mt19937 gen;
 
 WalkingGraph::WalkingGraph()
     : g_(UndirectedGraph())
@@ -16,8 +10,6 @@ WalkingGraph::WalkingGraph()
     , colors_(boost::get(boost::vertex_color, g_))
     , coords_(boost::get(vertex_coord_t(), g_))
     , weights_(boost::get(boost::edge_weight, g_))
-    , xmax_(std::numeric_limits<double>::min())
-    , ymax_(std::numeric_limits<double>::min())
 {
 }
 
@@ -48,18 +40,6 @@ void WalkingGraph::add_reader(double x, double y, int v1, int v2)
   rd.ratio = std::sqrt(CGAL::squared_distance(rd.center, coords_[rd.source]) /
                        CGAL::squared_distance(coords_[rd.target], coords_[rd.source]));
   readers_.push_back(rd);
-}
-
-void WalkingGraph::add_room(double x0, double y0, double x1, double y1, int node)
-{
-  rooms_.push_back(std::make_pair(IsoRect_2(x0, y0, x1, y1), vertices_[node]));
-  if (x1 > xmax_) xmax_ = x1;
-  if (y1 > ymax_) ymax_ = y1;
-}
-
-void WalkingGraph::add_hall(double x0, double y0, double x1, double y1, int dir)
-{
-  halls_.push_back(std::make_pair(IsoRect_2(x0, y0, x1, y1), dir));
 }
 
 void WalkingGraph::build_index(double unit)
@@ -128,14 +108,6 @@ int WalkingGraph::detected(const Point_2 &p, double r, int id)
   }
 
   return -1;
-}
-
-IsoRect_2 WalkingGraph::random_window(double ratio) const
-{
-  double r = 1 - std::sqrt(ratio);
-  boost::random::uniform_real_distribution<> unifx(0, xmax_ * r), unify(0, ymax_ * r);
-  double minx = unifx(gen), miny = unify(gen);
-  return IsoRect_2(minx, miny, minx + xmax_ * (1 - r), miny + ymax_ * (1 - r));
 }
 
 }

@@ -1,7 +1,11 @@
 #include <fstream>
+#include <iostream>
 #include <list>
 #include <vector>
 #include <utility>
+
+#include <CGAL/Range_segment_tree_traits.h>
+#include <CGAL/Range_tree_k.h>
 
 #include <boost/graph/random.hpp>
 #include <boost/random.hpp>
@@ -13,17 +17,26 @@
 
 using simsys::gen;
 extern boost::random::mt19937 gen;
-
-const double DURATION   = 100.0; // length of simulation
-const double HIT_RATE   = 0.95;  // probability of an object in detection range being detected
-const int NUM_OBJECT    = 1;     // number of moving objects under observation
-const int NUM_PARTICLE  = 128;   // number of sub-particles each object generate
-const int NUM_SNAPSHOTS = 10;    // number of timestamps to query
-const double RADIUS     = 2.0;   // detection range of RFID readers
-const double RATE       = 1.0;   // reader's reading rate, i.e. reading per second
-const double UNIT_LENGTH = 1.0;   // distance between anchor points along each axis.
+using std::cout;
+using std::endl;
 
 typedef std::map<std::pair<int, int>, std::map<int, double> > Anchor;
+
+typedef CGAL::Range_tree_map_traits_2<simsys::K, int> Traits;
+typedef CGAL::Range_tree_2<Traits> RangeTree;
+typedef Traits::Key Key;
+typedef Traits::Interval Interval;
+
+const double DURATION    = 100.0; // length of simulation
+const double HIT_RATE    = 0.95;  // probability of an object in detection range being detected
+const int NUM_OBJECT     = 30;    // number of moving objects under observation
+const int NUM_PARTICLE   = 128;   // number of sub-particles each object generate
+const int NUM_SNAPSHOTS  = 10;    // number of timestamps to query
+const int NUM_TESTS      = 1;     // number of tests to run for each set of parameters
+const int NUM_TIMESTAMP  = 1;     // number of timestamps to test against
+const double RADIUS      = 2.0;   // detection range of RFID readers
+const double RATE        = 1.0;   // reader's reading rate, i.e. reading per second
+const double UNIT_LENGTH = 1.0;   // distance between anchor points along each axis.
 
 // Generate readings for each objects
 std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
@@ -96,6 +109,58 @@ bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
   return true;
 }
 
+simsys::IsoRect_2
+random_window(double ratio, double xmax, double ymax)
+{
+  double r = 1 - std::sqrt(ratio);
+  boost::random::uniform_real_distribution<> unifx(0, xmax * r), unify(0, ymax * r);
+  double xmin = unifx(gen), ymin = unify(gen);
+  return simsys::IsoRect_2(xmin, ymin, xmin + xmax * (1 - r), ymin + ymax * (1 - r));
+}
+
+std::vector<std::pair<Interval, double> >
+intersect_room(const simsys::IsoRect_2 &win,
+               const std::vector<std::pair<simsys::IsoRect_2, simsys::Vertex> > &rooms)
+{
+  std::vector<std::pair<Interval, double> > results;
+  for (size_t i = 0; i < rooms.size(); ++i) {
+    auto res = CGAL::intersection(win, rooms[i].first);
+    // if the query intersects with a room, then the intersected part
+    // extends to the whole room.
+    if (res) {
+      const simsys::IsoRect_2 tmp = *boost::get<simsys::IsoRect_2>(&*res);
+      const simsys::IsoRect_2 room = rooms[i].first;
+      results.push_back(std::make_pair(Interval(room.min(), room.max()), tmp.area() / room.area()));
+    }
+  }
+  return results;
+}
+
+std::vector<std::pair<Interval, double> >
+intersect_hall(const simsys::IsoRect_2 &win,
+               const std::vector<std::pair<simsys::IsoRect_2, int> > &halls)
+{
+  std::vector<std::pair<Interval, double> > results;
+  for (size_t i = 0; i < halls.size(); ++i) {
+    auto res = CGAL::intersection(win, halls[i].first);
+    if (res) {
+      const simsys::IsoRect_2 tmp = *boost::get<simsys::IsoRect_2>(&*res);
+      const simsys::IsoRect_2 hall = halls[i].first;
+      if (0 == halls[i].second)
+        results.push_back(std::make_pair(
+            Interval(simsys::Point_2(tmp.xmin(), hall.ymin()),
+                     simsys::Point_2(tmp.xmax(), hall.ymax())),
+            (tmp.ymax() - tmp.ymin()) / (hall.ymax() - hall.ymax())));
+      else
+        results.push_back(std::make_pair(
+            Interval(simsys::Point_2(hall.xmin(), tmp.ymin()),
+                     simsys::Point_2(hall.xmax(), tmp.ymax())),
+            (tmp.xmax() - tmp.xmin()) / (hall.xmax() - hall.xmin())));
+    }
+  }
+  return results;
+}
+
 int main()
 {
   // number of readings
@@ -135,22 +200,29 @@ int main()
   }
 
   // Read in rooms configuration.
+  double xmax = 0, ymax = 0;
+  std::vector<std::pair<simsys::IsoRect_2, simsys::Vertex> > rooms;
   {
     std::ifstream fin("../data/room.txt");
     double x0, y0, x1, y1;
     int id, vertex;
-    while (fin >> id >> x0 >> y0 >> x1 >> y1 >> vertex)
-      g.add_room(x0, y0, x1, y1, vertex);
+    while (fin >> id >> x0 >> y0 >> x1 >> y1 >> vertex) {
+      rooms.push_back(std::make_pair(simsys::IsoRect_2(x0, y0, x1, y1),
+                                     g.indices()[vertex]));
+      if (x1 > xmax) xmax = x1;
+      if (y1 > ymax) ymax = y1;
+    }
     fin.close();
   }
 
   // Read in halls configuration
+  std::vector<std::pair<simsys::IsoRect_2, int> > halls;
   {
     std::ifstream fin("../data/hall.txt");
     double x0, y0, x1, y1;
     int dir;
     while (fin >> x0 >> y0 >> x1 >> y1 >> dir)
-      g.add_hall(x0, y0, x1, y1, dir);
+      halls.push_back(std::make_pair(simsys::IsoRect_2(x0, y0, x1, y1), dir));
     fin.close();
   }
 
@@ -160,7 +232,7 @@ int main()
   simsys::Particle::set_unit(1.0 / RATE);
   std::vector<simsys::Particle> objects;
   for (int i = 0; i < NUM_OBJECT; ++i) {
-    simsys::Particle p(g);
+    simsys::Particle p(g, i);
     p.advance(g, DURATION);
     objects.push_back(p);
     // p.print(g);
@@ -174,16 +246,52 @@ int main()
   //   std::cout << std::endl;
   // }
 
-  // Align subparticles to anchor points.
-  Anchor anchors;
-  {
-    boost::random::uniform_real_distribution<> unifd(50.0, DURATION);
-    double time = unifd(gen);
-    for (int i = 0; i < NUM_OBJECT; ++i)
-      predict(g, i, readings[i], time, anchors);
+  std::vector<double> ratios;
+  for (int i = 1; i < 10; ++i)
+    ratios.push_back(i * 0.1);
 
-    simsys::IsoRect_2 win = g.random_window(0.2);
-    // std::cout << win << std::endl;
+  boost::random::uniform_real_distribution<> unifd(50.0, DURATION);
+  for (int i = 0; i < NUM_TIMESTAMP; ++i) {
+    double timestamp = unifd(gen);
+    Anchor anchors;
+    RangeTree objecttree;
+    {
+      std::vector<Key> inputs;
+      for (int i = 0; i < NUM_OBJECT; ++i) {
+        predict(g, i, readings[i], timestamp, anchors);
+        inputs.push_back(Key(objects[i].pos(g), objects[i].id()));
+      }
+      objecttree.make_tree(inputs.begin(), inputs.end());
+    }
+
+    for (size_t j = 0; j < ratios.size(); ++j) {
+      for (int test = 0; test < NUM_TESTS; ++test) {
+        // First, adjust the query window.
+        simsys::IsoRect_2 win = random_window(ratios[j], xmax, ymax);
+        std::vector<std::pair<Interval, double> >
+            win_rooms = intersect_room(win, rooms),
+            win_halls = intersect_hall(win, halls);
+
+        // Do the query on real data as well as fake data.
+        std::vector<Key> real_results;
+        std::vector<simsys::AnchorKey> tmp_results;
+        for (size_t k = 0; k < win_rooms.size(); ++k) {
+          objecttree.window_query(win_rooms[k].first, std::back_inserter(real_results));
+          g.anchortree().window_query(win_rooms[k].first, std::back_inserter(tmp_results));
+        }
+        for (size_t k = 0; k < win_halls.size(); ++k) {
+          objecttree.window_query(win_halls[k].first, std::back_inserter(real_results));
+          g.anchortree().window_query(win_halls[k].first, std::back_inserter(tmp_results));
+        }
+
+        std::map<int, double> fake_results;
+        for (size_t k = 0; k < tmp_results.size(); ++i) {
+          std::pair<int, int> ind = tmp_results[k].second;;
+          for (auto it = anchors[ind].cbegin(); it != anchors[ind].cend(); ++it)
+            fake_results[it->first] += it->second;
+        }
+      }
+    }
   }
 
   return 0;
