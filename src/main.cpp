@@ -29,14 +29,13 @@ typedef Traits::Interval Interval;
 
 const double DURATION    = 100.0; // length of simulation
 const double HIT_RATE    = 0.95;  // probability of an object in detection range being detected
-const int NUM_OBJECT     = 30;    // number of moving objects under observation
+const int NUM_OBJECT     = 100;    // number of moving objects under observation
 const int NUM_PARTICLE   = 128;   // number of sub-particles each object generate
-const int NUM_SNAPSHOTS  = 10;    // number of timestamps to query
-const int NUM_TESTS      = 1;     // number of tests to run for each set of parameters
-const int NUM_TIMESTAMP  = 1;     // number of timestamps to test against
+const int NUM_TESTS      = 100;     // number of tests to run for each set of parameters
+const int NUM_TIMESTAMP  = 10;     // number of timestamps to test against
 const double RADIUS      = 2.0;   // detection range of RFID readers
 const double RATE        = 1.0;   // reader's reading rate, i.e. reading per second
-const double UNIT_LENGTH = 1.0;   // distance between anchor points along each axis.
+const double UNIT_LENGTH = .5;   // distance between anchor points along each axis.
 
 // Generate readings for each objects
 std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
@@ -246,9 +245,12 @@ int main()
   //   std::cout << std::endl;
   // }
 
-  std::vector<double> ratios;
-  for (int i = 1; i < 10; ++i)
-    ratios.push_back(i * 0.1);
+  const std::vector<double> ratios = {
+    0.01, 0.03, 0.09,
+    0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
+  };
+
+  std::vector<double> hitrates(ratios.size());
 
   boost::random::uniform_real_distribution<> unifd(50.0, DURATION);
   for (int i = 0; i < NUM_TIMESTAMP; ++i) {
@@ -257,9 +259,9 @@ int main()
     RangeTree objecttree;
     {
       std::vector<Key> inputs;
-      for (int i = 0; i < NUM_OBJECT; ++i) {
-        predict(g, i, readings[i], timestamp, anchors);
-        inputs.push_back(Key(objects[i].pos(g), objects[i].id()));
+      for (int j = 0; j < NUM_OBJECT; ++j) {
+        predict(g, objects[j].id(), readings[j], timestamp, anchors);
+        inputs.push_back(Key(objects[j].pos(g), objects[j].id()));
       }
       objecttree.make_tree(inputs.begin(), inputs.end());
     }
@@ -279,20 +281,39 @@ int main()
           objecttree.window_query(win_rooms[k].first, std::back_inserter(real_results));
           g.anchortree().window_query(win_rooms[k].first, std::back_inserter(tmp_results));
         }
+
         for (size_t k = 0; k < win_halls.size(); ++k) {
           objecttree.window_query(win_halls[k].first, std::back_inserter(real_results));
           g.anchortree().window_query(win_halls[k].first, std::back_inserter(tmp_results));
         }
 
         std::map<int, double> fake_results;
-        for (size_t k = 0; k < tmp_results.size(); ++i) {
+        for (size_t k = 0; k < tmp_results.size(); ++k) {
           std::pair<int, int> ind = tmp_results[k].second;;
           for (auto it = anchors[ind].cbegin(); it != anchors[ind].cend(); ++it)
             fake_results[it->first] += it->second;
         }
+
+        std::set<int> real;
+        for (size_t k = 0; k < real_results.size(); ++k)
+          real.insert(real_results[k].second);
+
+        int hit = 0;
+        for (auto it = fake_results.cbegin(); it != fake_results.end(); ++it)
+          if (real.end() != real.find(it->first)) ++hit;
+
+        hitrates[j] += 1.0 * hit / real.size();
       }
     }
   }
+
+  for (size_t i = 0; i < hitrates.size(); ++i)
+    hitrates[i] /= NUM_TESTS * NUM_TIMESTAMP;
+
+  std::ofstream of("hitrate");
+  for (size_t i = 0; i < hitrates.size(); ++i)
+    of << ratios[i] << ' ' << hitrates[i] << endl;
+  of.close();
 
   return 0;
 }
