@@ -1,4 +1,5 @@
 #include <cmath>
+#include <fstream>
 
 #include "walkinggraph.h"
 
@@ -67,16 +68,26 @@ void WalkingGraph::build_index(double unit)
                 end = coords_[boost::target(*it, g_)];
       Vector_2 v = end - start;
       if (CGAL::parallel(Line_2(Point_2(0, 0), v), Vertical)) {
+        if (start.y() > end.y()) {
+          Point_2 p = end;
+          end = start;
+          start = p;
+        }
         int y0 = std::ceil(start.y() / unit);
         int count = (end.y() - y0 * unit) / unit;
-        for (int dy = 0; dy < count; ++dy) {
+        for (int dy = 0; dy <= count; ++dy) {
           Point_2 p = Point_2(start.x(), y0 + dy * unit);
           inputs.push_back(Key(p, key(p, unit)));
         }
       } else {
+        if (start.x() > end.x()) {
+          Point_2 p = end;
+          end = start;
+          start = p;
+        }
         int x0 = std::ceil(start.x() / unit);
         int count = (end.x() - x0 * unit) / unit;
-        for (int dx = 0; dx < count; ++dx) {
+        for (int dx = 0; dx <= count; ++dx) {
           Point_2 p = Point_2(x0 + dx * unit, start.y());
           inputs.push_back(Key(p, key(p, unit)));
         }

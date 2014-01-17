@@ -30,12 +30,12 @@ typedef Traits::Interval Interval;
 const double DURATION    = 100.0; // length of simulation
 const double HIT_RATE    = 0.95;  // probability of an object in detection range being detected
 const int NUM_OBJECT     = 100;    // number of moving objects under observation
-const int NUM_PARTICLE   = 128;   // number of sub-particles each object generate
-const int NUM_TESTS      = 100;     // number of tests to run for each set of parameters
+const int NUM_PARTICLE   = 512;   // number of sub-particles each object generate
+const int NUM_TESTS      = 10;     // number of tests to run for each set of parameters
 const int NUM_TIMESTAMP  = 10;     // number of timestamps to test against
 const double RADIUS      = 2.0;   // detection range of RFID readers
 const double RATE        = 1.0;   // reader's reading rate, i.e. reading per second
-const double UNIT_LENGTH = .5;   // distance between anchor points along each axis.
+const double UNIT_LENGTH = 1.0;   // distance between anchor points along each axis.
 
 // Generate readings for each objects
 std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
@@ -88,7 +88,7 @@ bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
   // the reader.  This is NOT particle filter, just an extention of
   // symbolic model IMO.
   for (int i = start + 1; i <= end; ++i) {
-    for (auto it = subparticles.begin(); it != subparticles.end(); /* empt */) {
+    for (auto it = subparticles.begin(); it != subparticles.end(); /* empty */) {
       simsys::Point_2 p = it->advance(g);
       if (reading[i] >= 0 && g.detected(p, RADIUS, reading[i]) < 0)
         it = subparticles.erase(it);
@@ -288,8 +288,8 @@ int main()
         }
 
         std::map<int, double> fake_results;
-        for (size_t k = 0; k < tmp_results.size(); ++k) {
-          std::pair<int, int> ind = tmp_results[k].second;;
+        for (auto it = tmp_results.cbegin(); it != tmp_results.end(); ++it) {
+          std::pair<int, int> ind = it->second;
           for (auto it = anchors[ind].cbegin(); it != anchors[ind].cend(); ++it)
             fake_results[it->first] += it->second;
         }
@@ -305,12 +305,24 @@ int main()
         hitrates[j] += 1.0 * hit / real.size();
       }
     }
+
+    // std::map<int, double> test;
+
+    // for (auto it = anchors.begin(); it != anchors.end(); ++it) {
+    //   for (auto i = it->second.begin(); i != it->second.end(); ++i) {
+    //     test[i->first] += i->second;
+    //   }
+    // }
+
+    // for (auto it = test.begin(); it != test.end(); ++it)
+    //   cout << it->first << ' ' << it->second << endl;
+
   }
 
   for (size_t i = 0; i < hitrates.size(); ++i)
     hitrates[i] /= NUM_TESTS * NUM_TIMESTAMP;
 
-  std::ofstream of("hitrate");
+  std::ofstream of("hitrate.txt");
   for (size_t i = 0; i < hitrates.size(); ++i)
     of << ratios[i] << ' ' << hitrates[i] << endl;
   of.close();

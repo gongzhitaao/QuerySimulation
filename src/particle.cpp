@@ -24,7 +24,7 @@ Particle::Particle(const WalkingGraph &g, int id, double radius, int reader)
 {
   // Human average walking speed ranging roughly from 4.5 to 5.4 km/h
   // See: https://en.wikipedia.org/wiki/Walking
-  boost::random::normal_distribution<> norm(1.5, 0.2);
+  boost::random::normal_distribution<> norm(8, 0.2);
   velocity_ = norm(gen);
 
   boost::random::uniform_real_distribution<> unifd(0, 1);
