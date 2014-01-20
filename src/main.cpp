@@ -29,13 +29,13 @@ typedef Traits::Interval Interval;
 
 const double DURATION    = 100.0; // length of simulation
 const double HIT_RATE    = 0.95;  // probability of an object in detection range being detected
-const int NUM_OBJECT     = 100;    // number of moving objects under observation
-const int NUM_PARTICLE   = 512;   // number of sub-particles each object generate
-const int NUM_TESTS      = 10;     // number of tests to run for each set of parameters
-const int NUM_TIMESTAMP  = 10;     // number of timestamps to test against
-const double RADIUS      = 2.0;   // detection range of RFID readers
+const int NUM_OBJECT     = 30;    // number of moving objects under observation
+const int NUM_PARTICLE   = 128;   // number of sub-particles each object generate
+const int NUM_TESTS      = 1;     // number of tests to run for each set of parameters
+const int NUM_TIMESTAMP  = 1;     // number of timestamps to test against
+const double RADIUS      = 100.0;   // detection range of RFID readers
 const double RATE        = 1.0;   // reader's reading rate, i.e. reading per second
-const double UNIT_LENGTH = 1.0;   // distance between anchor points along each axis.
+const double UNIT_LENGTH = 50;   // distance between anchor points along each axis.
 
 // Generate readings for each objects
 std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
@@ -100,10 +100,17 @@ bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
   // unknown, which is exactly what we'd like to predict.
   double remain = t - end / RATE;
   int total = subparticles.size();
+
+  std::ofstream fout("new.txt", std::ios::app);
+
   for (auto it = subparticles.begin(); it != subparticles.end(); ++it) {
     simsys::Point_2 p = it->advance(g, remain);
     anchors[simsys::key(p, UNIT_LENGTH)][id] += 1.0 / total;
+    std::pair<int, int> k = simsys::key(p, UNIT_LENGTH);
+    fout << k.first << ' ' << k.second << endl;
   }
+
+  fout << endl;
 
   return true;
 }
@@ -119,16 +126,16 @@ random_window(double ratio, double xmax, double ymax)
 
 std::vector<std::pair<Interval, double> >
 intersect_room(const simsys::IsoRect_2 &win,
-               const std::vector<std::pair<simsys::IsoRect_2, simsys::Vertex> > &rooms)
+               const std::vector<simsys::IsoRect_2> &rooms)
 {
   std::vector<std::pair<Interval, double> > results;
   for (size_t i = 0; i < rooms.size(); ++i) {
-    auto res = CGAL::intersection(win, rooms[i].first);
+    auto res = CGAL::intersection(win, rooms[i]);
     // if the query intersects with a room, then the intersected part
     // extends to the whole room.
     if (res) {
       const simsys::IsoRect_2 tmp = *boost::get<simsys::IsoRect_2>(&*res);
-      const simsys::IsoRect_2 room = rooms[i].first;
+      const simsys::IsoRect_2 room = rooms[i];
       results.push_back(std::make_pair(Interval(room.min(), room.max()), tmp.area() / room.area()));
     }
   }
@@ -200,14 +207,13 @@ int main()
 
   // Read in rooms configuration.
   double xmax = 0, ymax = 0;
-  std::vector<std::pair<simsys::IsoRect_2, simsys::Vertex> > rooms;
+  std::vector<simsys::IsoRect_2> rooms;
   {
     std::ifstream fin("../data/room.txt");
     double x0, y0, x1, y1;
-    int id, vertex;
-    while (fin >> id >> x0 >> y0 >> x1 >> y1 >> vertex) {
-      rooms.push_back(std::make_pair(simsys::IsoRect_2(x0, y0, x1, y1),
-                                     g.indices()[vertex]));
+    int id;
+    while (fin >> id >> x0 >> y0 >> x1 >> y1) {
+      rooms.push_back(simsys::IsoRect_2(x0, y0, x1, y1));
       if (x1 > xmax) xmax = x1;
       if (y1 > ymax) ymax = y1;
     }
@@ -226,6 +232,15 @@ int main()
   }
 
   g.build_index(UNIT_LENGTH);
+
+  // for (auto it = boost::vertices(g()); it.first != it.second; ++it.first) {
+  //   cout << g.indices()[*(it.first)] << ": ";
+  //   for (auto out = boost::out_edges(*(it.first), g()); out.first != out.second; ++out.first) {
+  //     cout << "(" << g.indices()[source(*(out.first), g())]
+  //          << "," << g.indices()[target(*(out.first), g())] << ") ";
+  //   }
+  //   cout << endl;
+  // }
 
   // Initialize and run each particle along the graph for *DURATION*.
   simsys::Particle::set_unit(1.0 / RATE);
@@ -246,7 +261,7 @@ int main()
   // }
 
   const std::vector<double> ratios = {
-    0.01, 0.03, 0.09,
+    0.01, 0.03, 0.1,
     0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
   };
 
@@ -277,6 +292,7 @@ int main()
         // Do the query on real data as well as fake data.
         std::vector<Key> real_results;
         std::vector<simsys::AnchorKey> tmp_results;
+
         for (size_t k = 0; k < win_rooms.size(); ++k) {
           objecttree.window_query(win_rooms[k].first, std::back_inserter(real_results));
           g.anchortree().window_query(win_rooms[k].first, std::back_inserter(tmp_results));

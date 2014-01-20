@@ -24,7 +24,7 @@ Particle::Particle(const WalkingGraph &g, int id, double radius, int reader)
 {
   // Human average walking speed ranging roughly from 4.5 to 5.4 km/h
   // See: https://en.wikipedia.org/wiki/Walking
-  boost::random::normal_distribution<> norm(8, 0.2);
+  boost::random::normal_distribution<> norm(80, 0.2);
   velocity_ = norm(gen);
 
   boost::random::uniform_real_distribution<> unifd(0, 1);
@@ -219,6 +219,15 @@ void Particle::print(const WalkingGraph &g) const
   for (size_t i = 0; i < history_.size(); ++i)
     std::cout << history_[i].first << ' ' << g.indices()[history_[i].second] << std::endl;
   std::cout << std::endl;
+}
+
+void Particle::align(WalkingGraph &g)
+{
+  Edge e = boost::edge(source_, target_, g()).first;
+  int ind;
+  for (ind = 0; ind < g.anchorlists()[e].size(); ++ind) {
+
+  }
 }
 
 }

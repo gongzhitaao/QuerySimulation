@@ -11,6 +11,7 @@ WalkingGraph::WalkingGraph()
     , colors_(boost::get(boost::vertex_color, g_))
     , coords_(boost::get(vertex_coord_t(), g_))
     , weights_(boost::get(boost::edge_weight, g_))
+    , anchorlists_(boost::get(anchorlist_t(), g_))
 {
 }
 
@@ -60,13 +61,14 @@ void WalkingGraph::build_index(double unit)
     const Line_2 Horizontal(Point_2(0, 0), Point_2(unit, 0));
     const Line_2 Vertical(Point_2(0, 0), Point_2(0, unit));
 
-    typedef AnchorTraits::Key Key;
     std::vector<Key> inputs;
     boost::graph_traits<UndirectedGraph>::edge_iterator it, end;
     for (boost::tie(it, end) = boost::edges(g_); it != end; ++it) {
+
       Point_2 start = coords_[boost::source(*it, g_)],
                 end = coords_[boost::target(*it, g_)];
       Vector_2 v = end - start;
+
       if (CGAL::parallel(Line_2(Point_2(0, 0), v), Vertical)) {
         if (start.y() > end.y()) {
           Point_2 p = end;
@@ -77,7 +79,8 @@ void WalkingGraph::build_index(double unit)
         int count = (end.y() - y0 * unit) / unit;
         for (int dy = 0; dy <= count; ++dy) {
           Point_2 p = Point_2(start.x(), y0 + dy * unit);
-          inputs.push_back(Key(p, key(p, unit)));
+          inputs.push_back(AnchorKey(p, std::make_pair(*it, dy)));
+          anchorlists_[*it].push_back({p, std::map<int, double>()});
         }
       } else {
         if (start.x() > end.x()) {
@@ -89,7 +92,8 @@ void WalkingGraph::build_index(double unit)
         int count = (end.x() - x0 * unit) / unit;
         for (int dx = 0; dx <= count; ++dx) {
           Point_2 p = Point_2(x0 + dx * unit, start.y());
-          inputs.push_back(Key(p, key(p, unit)));
+          inputs.push_back(AnchorKey(p, std::make_pair(*it, dx)));
+          anchorlists_[*it].push_back({p, std::map<int, double>()});
         }
       }
     }

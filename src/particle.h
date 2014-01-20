@@ -29,6 +29,7 @@ class Particle
   void print(const WalkingGraph &g) const;
 
   const int id() const { return id_; }
+  void align(WalkingGraph &g);
 
  private:
   Vertex random_next(const Vertex v, const WalkingGraph &g, const Vertex u = NullVertex) const;

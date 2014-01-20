@@ -29,7 +29,13 @@ typedef boost::property<boost::vertex_index1_t, int> VertexIndexProperty;
 typedef boost::property<vertex_coord_t, Point_2, VertexIndexProperty> CoordProperty;
 typedef boost::property<boost::vertex_color_t, vertex_color_enum, CoordProperty> VertexProperty;
 
-typedef boost::property<boost::edge_weight_t, double> EdgeProperty;
+struct anchorlist_t { typedef boost::edge_property_tag kind; };
+struct Anchor {
+  Point_2 pos;
+  std::map<int, double> probs;
+};
+typedef boost::property<anchorlist_t, std::vector<Anchor> > AnchorListProperty;
+typedef boost::property<boost::edge_weight_t, double, AnchorListProperty> EdgeProperty;
 
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
                               VertexProperty, EdgeProperty> UndirectedGraph;
@@ -41,8 +47,9 @@ typedef boost::property_map<UndirectedGraph, boost::vertex_index1_t>::type Verte
 typedef boost::property_map<UndirectedGraph, boost::vertex_color_t>::type ColorMap;
 typedef boost::property_map<UndirectedGraph, vertex_coord_t>::type CoordMap;
 typedef boost::property_map<UndirectedGraph, boost::edge_weight_t>::type WeightMap;
+typedef boost::property_map<UndirectedGraph, anchorlist_t>::type AnchorListMap;
 
-typedef CGAL::Range_tree_map_traits_2<K, std::pair<int, int> > AnchorTraits;
+typedef CGAL::Range_tree_map_traits_2<K, std::pair<Edge, int> > AnchorTraits;
 typedef CGAL::Range_tree_2<AnchorTraits> AnchorTree;
 typedef AnchorTraits::Key AnchorKey;
 
@@ -51,11 +58,6 @@ struct Reader {
   Vertex source, target;
   double ratio;
 };
-
-inline std::pair<int, int> key(const simsys::Point_2 p, double unit)
-{
-  return std::make_pair((int)(p.x() / unit), (int)(p.y() / unit));
-}
 
 class WalkingGraph
 {
@@ -79,6 +81,9 @@ class WalkingGraph
   const CoordMap &coords() const { return coords_; }
   const WeightMap &weights() const { return weights_; }
   const Reader &reader(int i) const { return readers_[i]; }
+  const AnchorListMap &anchorlists() const { return anchorlists_; }
+
+  AnchorListMap &anchorlists() { return anchorlists_; }
   AnchorTree &anchortree() { return anchortree_; }
 
  private:
@@ -88,6 +93,7 @@ class WalkingGraph
   ColorMap colors_;
   CoordMap coords_;
   WeightMap weights_;
+  AnchorListMap anchorlists_;
 
   std::map<int, Vertex> vertices_;
   std::vector<Reader> readers_;
