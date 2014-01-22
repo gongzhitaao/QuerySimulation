@@ -1,6 +1,8 @@
 #include <fstream>
 #include <iostream>
 #include <list>
+#include <string>
+#include <sstream>
 #include <vector>
 #include <utility>
 
@@ -10,45 +12,33 @@
 #include <boost/graph/random.hpp>
 #include <boost/random.hpp>
 #include <boost/random/normal_distribution.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "defs.h"
 #include "walkinggraph.h"
 #include "particle.h"
 
-using simsys::gen;
-extern boost::random::mt19937 gen;
 using std::cout;
 using std::endl;
 
-typedef std::map<std::pair<int, int>, std::map<int, double> > Anchor;
+typedef std::vector<std::map<int, double> > AnchorMap;
 
 typedef CGAL::Range_tree_map_traits_2<simsys::K, int> Traits;
 typedef CGAL::Range_tree_2<Traits> RangeTree;
 typedef Traits::Key Key;
 typedef Traits::Interval Interval;
 
-const double DURATION    = 100.0; // length of simulation
-const double HIT_RATE    = 0.95;  // probability of an object in detection range being detected
-const int NUM_OBJECT     = 30;    // number of moving objects under observation
-const int NUM_PARTICLE   = 128;   // number of sub-particles each object generate
-const int NUM_TESTS      = 1;     // number of tests to run for each set of parameters
-const int NUM_TIMESTAMP  = 1;     // number of timestamps to test against
-const double RADIUS      = 100.0;   // detection range of RFID readers
-const double RATE        = 1.0;   // reader's reading rate, i.e. reading per second
-const double UNIT_LENGTH = 50;   // distance between anchor points along each axis.
-
 // Generate readings for each objects
 std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
-                                      const std::vector<simsys::Particle> &particles,
-                                      double unit, int count)
+                                      const std::vector<simsys::Particle> &particles)
 {
   boost::random::uniform_real_distribution<> unifd(0, 1);
   std::vector<std::vector<int> > readings;
   for (size_t i = 0; i < particles.size(); ++i) {
     std::vector<int> tmp;
-    for (int j = 0; j < count; ++j) {
+    for (int j = 0; j < DURATION; ++j) {
       if (unifd(gen) > HIT_RATE) tmp.push_back(-1);
-      else tmp.push_back(g.detected(particles[i].pos(g, j * unit), RADIUS));
+      else tmp.push_back(g.detected(particles[i].pos(g, j), RADIUS));
     }
     readings.push_back(tmp);
   }
@@ -56,11 +46,11 @@ std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
 }
 
 bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
-             double t, Anchor &anchors, int limit = 2)
+             double t, AnchorMap &anchors, int limit = 2)
 {
   // The number of valid readings, i.e. reading >= 0, in [start, end]
   // is *limit*.
-  int end = t * RATE;
+  int end = t;
   int start = end;
   {
     int last = -1;
@@ -98,19 +88,11 @@ bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
 
   // Predicting.  During the *remain*, the object's position is
   // unknown, which is exactly what we'd like to predict.
-  double remain = t - end / RATE;
+  double remain = t - end;
   int total = subparticles.size();
-
-  std::ofstream fout("new.txt", std::ios::app);
-
   for (auto it = subparticles.begin(); it != subparticles.end(); ++it) {
-    simsys::Point_2 p = it->advance(g, remain);
-    anchors[simsys::key(p, UNIT_LENGTH)][id] += 1.0 / total;
-    std::pair<int, int> k = simsys::key(p, UNIT_LENGTH);
-    fout << k.first << ' ' << k.second << endl;
+    it->advance(g, remain);
   }
-
-  fout << endl;
 
   return true;
 }
@@ -136,7 +118,8 @@ intersect_room(const simsys::IsoRect_2 &win,
     if (res) {
       const simsys::IsoRect_2 tmp = *boost::get<simsys::IsoRect_2>(&*res);
       const simsys::IsoRect_2 room = rooms[i];
-      results.push_back(std::make_pair(Interval(room.min(), room.max()), tmp.area() / room.area()));
+      results.push_back(std::make_pair(Interval(room.min(), room.max()),
+                                       tmp.area() / room.area()));
     }
   }
   return results;
@@ -169,18 +152,23 @@ intersect_hall(const simsys::IsoRect_2 &win,
 
 int main()
 {
-  // number of readings
-  const int NUM_READING = (int) (DURATION * RATE);
-
   simsys::WalkingGraph g;
+
+  const std::string Commenter("//");
 
   // Read in vertices for walking graph.
   {
     std::ifstream fin("../data/node.txt");
-    int id, type;
-    double x, y;
-    while (fin >> id >> x >> y >> type)
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      int id, type;
+      double x, y;
+      ss >> id >> x >> y >> type;
       g.add_vertex(id, x, y, (simsys::vertex_color_enum) type);
+    }
     fin.close();
   }
 
@@ -189,30 +177,47 @@ int main()
   // walking graph edge is parallel to X or Y axis.
   {
     std::ifstream fin("../data/edge.txt");
-    int v1, v2;
-    while (fin >> v1 >> v2)
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      int v1, v2;
+      ss >> v1 >> v2;
       g.add_edge(v1, v2);
+    }
     fin.close();
   }
 
   // Read in RFID readers.
   {
     std::ifstream fin("../data/rfid.txt");
-    int id, v1, v2;
-    double x, y;
-    while (fin >> id >> x >> y >> v1 >> v2)
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      int id, v1, v2;
+      double x, y;
+      ss >> id >> x >> y >> v1 >> v2;
       g.add_reader(x, y, v1, v2);
+    }
     fin.close();
   }
 
   // Read in rooms configuration.
-  double xmax = 0, ymax = 0;
+  double xmax = 0.0, ymax = 0.0;
   std::vector<simsys::IsoRect_2> rooms;
   {
     std::ifstream fin("../data/room.txt");
-    double x0, y0, x1, y1;
-    int id;
-    while (fin >> id >> x0 >> y0 >> x1 >> y1) {
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      double x0, y0, x1, y1;
+      int id;
+      ss >> id >> x0 >> y0 >> x1 >> y1;
       rooms.push_back(simsys::IsoRect_2(x0, y0, x1, y1));
       if (x1 > xmax) xmax = x1;
       if (y1 > ymax) ymax = y1;
@@ -224,10 +229,16 @@ int main()
   std::vector<std::pair<simsys::IsoRect_2, int> > halls;
   {
     std::ifstream fin("../data/hall.txt");
-    double x0, y0, x1, y1;
-    int dir;
-    while (fin >> x0 >> y0 >> x1 >> y1 >> dir)
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      double x0, y0, x1, y1;
+      int dir;
+      ss >> x0 >> y0 >> x1 >> y1 >> dir;
       halls.push_back(std::make_pair(simsys::IsoRect_2(x0, y0, x1, y1), dir));
+    }
     fin.close();
   }
 
@@ -243,33 +254,34 @@ int main()
   // }
 
   // Initialize and run each particle along the graph for *DURATION*.
-  simsys::Particle::set_unit(1.0 / RATE);
   std::vector<simsys::Particle> objects;
   for (int i = 0; i < NUM_OBJECT; ++i) {
-    simsys::Particle p(g, i);
-    p.advance(g, DURATION);
-    objects.push_back(p);
+    objects.push_back(simsys::Particle(g, i));
+    objects[i].advance(g, DURATION);
     // p.print(g);
   }
 
   // Generate RFID readings for each object.
-  std::vector<std::vector<int> > readings = detect(g, objects, 1.0 / RATE, NUM_READING);
-  // for (size_t i = 0; i < readings.size(); ++i) {
-  //   for (size_t j = 0; j < readings[i].size(); ++j)
-  //     std::cout << j / RATE << " (" << objects[i].pos(g, j / RATE) << ") " << readings[i][j] << std::endl;
-  //   std::cout << std::endl;
-  // }
+  std::vector<std::vector<int> > readings = detect(g, objects);
+
+  for (size_t i = 0; i < readings.size(); ++i) {
+    for (size_t j = 0; j < readings[i].size(); ++j)
+      std::cout << j << " (" << objects[i].pos(g, j) << ") " << readings[i][j] << std::endl;
+    std::cout << std::endl;
+  }
+
+  /*
 
   const std::vector<double> ratios = {
     0.01, 0.03, 0.1,
     0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
   };
 
-  std::vector<double> hitrates(ratios.size());
+  std::vector<int> hitrates(ratios.size());
 
   boost::random::uniform_real_distribution<> unifd(50.0, DURATION);
   for (int i = 0; i < NUM_TIMESTAMP; ++i) {
-    double timestamp = unifd(gen);
+    int timestamp = unifd(gen);
     Anchor anchors;
     RangeTree objecttree;
     {
@@ -285,7 +297,7 @@ int main()
       for (int test = 0; test < NUM_TESTS; ++test) {
         // First, adjust the query window.
         simsys::IsoRect_2 win = random_window(ratios[j], xmax, ymax);
-        std::vector<std::pair<Interval, double> >
+        std::vector<std::pair<Interval, int> >
             win_rooms = intersect_room(win, rooms),
             win_halls = intersect_hall(win, halls);
 
@@ -303,7 +315,7 @@ int main()
           g.anchortree().window_query(win_halls[k].first, std::back_inserter(tmp_results));
         }
 
-        std::map<int, double> fake_results;
+        std::map<int, int> fake_results;
         for (auto it = tmp_results.cbegin(); it != tmp_results.end(); ++it) {
           std::pair<int, int> ind = it->second;
           for (auto it = anchors[ind].cbegin(); it != anchors[ind].cend(); ++it)
@@ -322,7 +334,7 @@ int main()
       }
     }
 
-    // std::map<int, double> test;
+    // std::map<int, int> test;
 
     // for (auto it = anchors.begin(); it != anchors.end(); ++it) {
     //   for (auto i = it->second.begin(); i != it->second.end(); ++i) {
@@ -342,6 +354,8 @@ int main()
   for (size_t i = 0; i < hitrates.size(); ++i)
     of << ratios[i] << ' ' << hitrates[i] << endl;
   of.close();
+
+  */
 
   return 0;
 }

@@ -2,11 +2,18 @@
 #define DEFS_H_
 
 #include <boost/random.hpp>
+#include <boost/random/random_device.hpp>
 
-namespace simsys {
-
+extern boost::random::random_device rd;
 extern boost::random::mt19937 gen;
 
-}
+extern const double HIT_RATE;
+extern const int DURATION;
+extern const int NUM_OBJECT;
+extern const int NUM_PARTICLE;
+extern const int NUM_TIMESTAMP;
+extern const int NUM_TEST_PER_TIMESTAMP;
+extern const double RADIUS;
+extern const double UNIT_LENGTH;
 
 #endif  // DEFS_H_

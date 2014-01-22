@@ -10,48 +10,40 @@
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Cartesian.h>
 #include <CGAL/Range_segment_tree_traits.h>
 #include <CGAL/Range_tree_k.h>
+#include <CGAL/Search_traits_2.h>
+#include <CGAL/Search_traits_adapter.h>
+#include <CGAL/Orthogonal_k_neighbor_search.h>
+#include <CGAL/property_map.h>
 
 namespace simsys {
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef CGAL::Cartesian<double> K;
 typedef K::Point_2 Point_2;
-typedef K::Circle_2 Circle_2;
-typedef K::Vector_2 Vector_2;
 typedef CGAL::Iso_rectangle_2<K> IsoRect_2;
 
 enum vertex_color_enum { HALL, DOOR, ROOM, VERTEX_COLOR_ENUM };
 
 struct vertex_coord_t { typedef boost::vertex_property_tag kind; };
-typedef boost::property<boost::vertex_index1_t, int> VertexIndexProperty;
-typedef boost::property<vertex_coord_t, Point_2, VertexIndexProperty> CoordProperty;
+typedef boost::property<boost::vertex_index1_t, int> VertexLabelProperty;
+typedef boost::property<vertex_coord_t, Point_2, VertexLabelProperty> CoordProperty;
 typedef boost::property<boost::vertex_color_t, vertex_color_enum, CoordProperty> VertexProperty;
 
-struct anchorlist_t { typedef boost::edge_property_tag kind; };
-struct Anchor {
-  Point_2 pos;
-  std::map<int, double> probs;
-};
-typedef boost::property<anchorlist_t, std::vector<Anchor> > AnchorListProperty;
-typedef boost::property<boost::edge_weight_t, double, AnchorListProperty> EdgeProperty;
+typedef boost::property<boost::edge_weight_t, double> EdgeProperty;
 
 typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
                               VertexProperty, EdgeProperty> UndirectedGraph;
 typedef boost::graph_traits<UndirectedGraph>::vertex_descriptor Vertex;
 typedef boost::graph_traits<UndirectedGraph>::edge_descriptor Edge;
-const Vertex NullVertex = boost::graph_traits<UndirectedGraph>::null_vertex();
 
-typedef boost::property_map<UndirectedGraph, boost::vertex_index1_t>::type VertexIndexMap;
+typedef boost::property_map<UndirectedGraph, boost::vertex_index1_t>::type VertexLabelMap;
 typedef boost::property_map<UndirectedGraph, boost::vertex_color_t>::type ColorMap;
 typedef boost::property_map<UndirectedGraph, vertex_coord_t>::type CoordMap;
 typedef boost::property_map<UndirectedGraph, boost::edge_weight_t>::type WeightMap;
-typedef boost::property_map<UndirectedGraph, anchorlist_t>::type AnchorListMap;
 
-typedef CGAL::Range_tree_map_traits_2<K, std::pair<Edge, int> > AnchorTraits;
-typedef CGAL::Range_tree_2<AnchorTraits> AnchorTree;
-typedef AnchorTraits::Key AnchorKey;
+const Vertex NullVertex = boost::graph_traits<UndirectedGraph>::null_vertex();
 
 struct Reader {
   Point_2 center;
@@ -61,8 +53,12 @@ struct Reader {
 
 class WalkingGraph
 {
-  typedef CGAL::Range_tree_map_traits_2<K, int> ReaderTraits;
-  typedef CGAL::Range_tree_2<ReaderTraits> ReaderTree;
+  typedef boost::tuple<Point_2, int> Point_and_int;
+  typedef CGAL::Search_traits_2<K> Traits_base;
+  typedef CGAL::Search_traits_adapter<
+    Point_and_int, CGAL::Nth_of_tuple_property_map<0, Point_and_int>, Traits_base> Traits;
+  typedef CGAL::Orthogonal_k_neighbor_search<Traits> K_neighbor_search;
+  typedef K_neighbor_search::Tree Tree;
 
  public:
   WalkingGraph();
@@ -77,29 +73,27 @@ class WalkingGraph
   UndirectedGraph &operator() () { return g_; }
   const UndirectedGraph &operator() () const { return g_; }
 
-  const VertexIndexMap &indices() const { return vertindices_; }
-  const CoordMap &coords() const { return coords_; }
-  const WeightMap &weights() const { return weights_; }
+  int label(Vertex v) const { return labels_[v]; }
+  const Point_2 &coord(Vertex v) const { return coords_[v]; }
+  double  weight(Vertex u, Vertex v) const { return weights_[boost::edge(u, v, g_).first]; }
   const Reader &reader(int i) const { return readers_[i]; }
-  const AnchorListMap &anchorlists() const { return anchorlists_; }
 
-  AnchorListMap &anchorlists() { return anchorlists_; }
-  AnchorTree &anchortree() { return anchortree_; }
+  std::vector<Vertex> path(Vertex source, Vertex target) const;
+  std::vector<int> anchors(const std::pair<Point_2, Point_2> &win);
 
  private:
   UndirectedGraph g_;
 
-  VertexIndexMap vertindices_;
+  VertexLabelMap labels_;
   ColorMap colors_;
   CoordMap coords_;
   WeightMap weights_;
-  AnchorListMap anchorlists_;
 
   std::map<int, Vertex> vertices_;
   std::vector<Reader> readers_;
 
-  ReaderTree readertree_;
-  AnchorTree anchortree_;
+  Tree readertree_;
+  Tree anchortree_;
 };
 
 }
