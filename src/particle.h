@@ -18,8 +18,9 @@ class Particle
 {
  public:
   Particle(const WalkingGraph &g, int id = -1, double radius = -1.0, int reader = -1);
+  Particle(const Particle &other);
 
-  Point_2 advance(const WalkingGraph &g, double t = -1);
+  Point_2 advance(const WalkingGraph &g, double duration = -1.0);
   Point_2 pos(const WalkingGraph &g, double t = -1) const;
   Trace pos(const WalkingGraph &g, double start, double duration, int count) const;
 
@@ -31,16 +32,16 @@ class Particle
   const int id() const { return id_; }
 
  private:
-  Vertex random_next(const Vertex v, const WalkingGraph &g, const Vertex u = NullVertex) const;
+  Vertex random_next(Vertex cur, const WalkingGraph &g, Vertex pre = NullVertex) const;
 
   static double unit_;
 
+  const int id_;
+
   Vertex source_;
   Vertex target_;
-  double p_;
   double velocity_;
-
-  const int id_;
+  double p_;
 
   std::vector<std::pair<double, Vertex> > history_;
 };
