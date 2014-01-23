@@ -57,11 +57,10 @@ Particle::Particle(const Particle &other)
     , source_(other.source_)
     , target_(other.target_)
     , p_(other.p_)
+    , history_(other.history_)
 {
   boost::random::normal_distribution<> norm(80, 10);
   velocity_ = norm(gen);
-  history_.clear();
-  history_.push_back(other.history_.back());
 }
 
 // Randomly choose next vertex to advance to.  If u which is where the
@@ -186,7 +185,6 @@ void Particle::print(const WalkingGraph &g) const
 {
   for (size_t i = 0; i < history_.size(); ++i)
     std::cout << history_[i].first << ' ' << g.label(history_[i].second) << std::endl;
-  std::cout << std::endl;
 }
 
 }

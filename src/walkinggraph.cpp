@@ -7,8 +7,6 @@
 #include <boost/graph/astar_search.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 
-#include <CGAL/Fuzzy_iso_box.h>
-
 #include "walkinggraph.h"
 #include "defs.h"
 
@@ -121,11 +119,24 @@ int WalkingGraph::detected(const Point_2 &p, double r, int id)
 
   if (id <= 0) {
     K_neighbor_search search(readertree_, p, 1);
-    if (search.begin() == search.end()) return -1;
     ind = boost::get<1>(search.begin()->first);
   }
 
   return (CGAL::squared_distance(p, readers_[ind].center) <= r * r) ? ind + 1 : -1;
+}
+
+int WalkingGraph::align(const Point_2 &p)
+{
+  K_neighbor_search search(anchortree_, p, 1);
+  Point_2 center = boost::get<0>(search.begin()->first);
+  return boost::get<1>(search.begin()->first);
+}
+
+std::vector<Point_and_int> WalkingGraph::anchors(const Fuzzy_iso_box &win)
+{
+  std::vector<Point_and_int> res;
+  anchortree_.search(std::back_inserter(res), win);
+  return res;
 }
 
 struct found_goal {};
@@ -177,17 +188,6 @@ std::vector<Vertex> WalkingGraph::path(Vertex source, Vertex target) const
   }
 
   return std::vector<Vertex>();
-}
-
-std::vector<int> WalkingGraph::anchors(const std::pair<Point_2, Point_2> &win)
-{
-  // typedef CGAL::Fuzzy_iso_box<Traits> Fuzzy_iso_box;
-  // std::vector<std::pair<int, Point_2> > tmp;
-  // anchortree_.search(std::back_inserter(tmp), Fuzzy_iso_box(win.first, win.second));
-  std::vector<int> res;
-  // std::transform(tmp.begin(), tmp.end(), std::back_inserter(res),
-  //                [] (const std::pair<int, Point_2> &i) { return i.first; });
-  return res;
 }
 
 }

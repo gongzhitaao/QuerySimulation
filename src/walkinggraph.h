@@ -17,6 +17,8 @@
 #include <CGAL/Search_traits_adapter.h>
 #include <CGAL/Orthogonal_k_neighbor_search.h>
 #include <CGAL/property_map.h>
+#include <CGAL/Fuzzy_iso_box.h>
+
 
 namespace simsys {
 
@@ -45,6 +47,15 @@ typedef boost::property_map<UndirectedGraph, boost::edge_weight_t>::type WeightM
 
 const Vertex NullVertex = boost::graph_traits<UndirectedGraph>::null_vertex();
 
+typedef boost::tuple<Point_2, int> Point_and_int;
+typedef CGAL::Search_traits_2<K> Traits_base;
+typedef CGAL::Search_traits_adapter<
+  Point_and_int, CGAL::Nth_of_tuple_property_map<0, Point_and_int>, Traits_base> Traits;
+
+typedef CGAL::Orthogonal_k_neighbor_search<Traits> K_neighbor_search;
+typedef K_neighbor_search::Tree Tree;
+typedef CGAL::Fuzzy_iso_box<Traits> Fuzzy_iso_box;
+
 struct Reader {
   Point_2 center;
   Vertex source, target;
@@ -53,13 +64,6 @@ struct Reader {
 
 class WalkingGraph
 {
-  typedef boost::tuple<Point_2, int> Point_and_int;
-  typedef CGAL::Search_traits_2<K> Traits_base;
-  typedef CGAL::Search_traits_adapter<
-    Point_and_int, CGAL::Nth_of_tuple_property_map<0, Point_and_int>, Traits_base> Traits;
-  typedef CGAL::Orthogonal_k_neighbor_search<Traits> K_neighbor_search;
-  typedef K_neighbor_search::Tree Tree;
-
  public:
   WalkingGraph();
 
@@ -70,6 +74,10 @@ class WalkingGraph
   void build_index(double unit);
   int detected(const Point_2 &p, double r, int id = -1);
 
+  int align(const Point_2 &p);
+  std::vector<Point_and_int> anchors(const Fuzzy_iso_box &win);
+  std::vector<Vertex> path(Vertex source, Vertex target) const;
+
   UndirectedGraph &operator() () { return g_; }
   const UndirectedGraph &operator() () const { return g_; }
 
@@ -78,9 +86,6 @@ class WalkingGraph
   double weight(Vertex u, Vertex v) const { return weights_[boost::edge(u, v, g_).first]; }
   const Reader &reader(int i) const { return readers_[i]; }
   vertex_color_enum color(Vertex v) const { return colors_[v]; }
-
-  std::vector<Vertex> path(Vertex source, Vertex target) const;
-  std::vector<int> anchors(const std::pair<Point_2, Point_2> &win);
 
  private:
   UndirectedGraph g_;
