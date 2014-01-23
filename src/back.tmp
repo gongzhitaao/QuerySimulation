@@ -1,0 +1,36 @@
+      // Particle advances for a period of time set by the user, during
+      // which, the particle will randomly choose its destination and
+      // advance for it.  Upon reaching its destination, the particle
+      // will repeat the above process till it runs out of time.  This
+      // is slightly different than the *duration < 0* case.
+
+      dist = duration - left;
+
+      if (dist >= 0) {
+        elapsed += left;
+        history_.push_back(std::make_pair(elapsed, target_));
+        std::cout << g.label(target_) << std::endl;
+
+        while (dist >= 0) {
+          source_ = target_;
+          Vertex goal = boost::random_vertex(g(), gen);
+          std::vector<Vertex> p = g.path(source_, goal);
+
+          for (Vertex u = source_, v; u != p[u]; u = p[u]) {
+            v = p[u];
+
+            source_ = u;
+            target_ = v;
+
+            left = g.weight(boost::edge(u, v, g()).first);
+            dist -= left;
+
+            if (dist < 0) break;
+
+            elapsed += left;
+            history_.push_back(std::make_pair(elapsed, target_));
+            std::cout << g.label(target_) << std::endl;
+          }
+          std::cout << "---" << std::endl;
+        }
+      }
