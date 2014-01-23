@@ -75,8 +75,9 @@ class WalkingGraph
 
   int label(Vertex v) const { return labels_[v]; }
   const Point_2 &coord(Vertex v) const { return coords_[v]; }
-  double  weight(Vertex u, Vertex v) const { return weights_[boost::edge(u, v, g_).first]; }
+  double weight(Vertex u, Vertex v) const { return weights_[boost::edge(u, v, g_).first]; }
   const Reader &reader(int i) const { return readers_[i]; }
+  vertex_color_enum color(Vertex v) const { return colors_[v]; }
 
   std::vector<Vertex> path(Vertex source, Vertex target) const;
   std::vector<int> anchors(const std::pair<Point_2, Point_2> &win);

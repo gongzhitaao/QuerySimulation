@@ -21,7 +21,7 @@
 using std::cout;
 using std::endl;
 
-typedef std::vector<std::map<int, double> > AnchorMap;
+typedef std::map<std::map<int, double> > AnchorMap;
 
 typedef CGAL::Range_tree_map_traits_2<simsys::K, int> Traits;
 typedef CGAL::Range_tree_2<Traits> RangeTree;
@@ -258,7 +258,7 @@ int main()
   for (int i = 0; i < NUM_OBJECT; ++i) {
     objects.push_back(simsys::Particle(g, i));
     objects[i].advance(g, DURATION);
-    // p.print(g);
+    objects[i].print(g);
   }
 
   // Generate RFID readings for each object.

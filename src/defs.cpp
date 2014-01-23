@@ -11,3 +11,5 @@ const int NUM_TIMESTAMP          = 1;     // number of timestamps to test agains
 const int NUM_TEST_PER_TIMESTAMP = 1;     // number of tests to run for each set of parameters
 const double RADIUS              = 100.0; // detection range of RFID readers
 const double UNIT_LENGTH         = 50.0;  // distance between anchor points along each axis.
+const double KNOCK_DOOR          = 0.1;   // probability of entering a room
+const double ENTER_ROOM          = 0.1;   // probability of entering a room

@@ -37,11 +37,11 @@ Particle::Particle(const WalkingGraph &g, int id, double radius, int reader)
       p_ = 1 - rd.ratio;
     }
 
-    history_.push_back(std::make_pair(-p_ / velocity_, source_));
+    history_.push_back(std::make_pair(-p_ * g.weight(source_, target_) / velocity_, source_));
 
     advance(g, unifd(gen) * radius);
     history_.clear();
-    history_.push_back(std::make_pair(-p_ / velocity_, source_));
+    history_.push_back(std::make_pair(-p_ * g.weight(source_, target_) / velocity_, source_));
 
   } else {
     source_ = boost::random_vertex(g(), gen);
@@ -60,7 +60,7 @@ Particle::Particle(const Particle &other)
 {
   boost::random::normal_distribution<> norm(80, 10);
   velocity_ = norm(gen);
-
+  history_.clear();
   history_.push_back(other.history_.back());
 }
 
@@ -68,18 +68,43 @@ Particle::Particle(const Particle &other)
 // particle came from is present, then the randomly chosen vertex may
 // not be u unless the out degree of v is only one in which we have no
 // choice.  In this way, the particle preserves its direction.
-Vertex Particle::random_next(const Vertex v, const WalkingGraph &g, const Vertex u) const
+Vertex Particle::random_next(Vertex cur, const WalkingGraph &g, Vertex pre) const
 {
-  int outdegree = boost::out_degree(v, g());
-  boost::random::uniform_int_distribution<> unifi(0, outdegree - 1);
-  Vertex target = NullVertex;
-  {
-    do {
-      auto it = boost::next(boost::out_edges(v, g()).first, unifi(gen));
-      target = boost::target(*it, g());
-    } while (outdegree > 1 && u == target);
+  std::set<Vertex> hall, door, room;
+  auto pairit = boost::out_edges(cur, g());
+  for (auto it = pairit.first; it != pairit.second; ++it) {
+    Vertex v = boost::target(*it, g());
+    switch (g.color(v)) {
+      case HALL: hall.insert(v); break;
+      case DOOR: door.insert(v); break;
+      case ROOM: room.insert(v); break;
+      default: break;
+    }
   }
-  return target;
+
+  if (NullVertex == pre) {
+    if (hall.size() > 0) {
+      boost::random::uniform_int_distribution<> unifi(0, hall.size() - 1);
+      return *(boost::next(hall.begin(), unifi(gen)));
+    }
+    return *(door.begin());
+  }
+
+  boost::random::uniform_real_distribution<> unifd(0, 1);
+
+  if (room.size() > 0 && g.color(pre) != ROOM &&
+      unifd(gen) < ENTER_ROOM)
+    return *(room.begin());
+
+  if (door.size() > 0
+      && (g.color(cur) == ROOM ||
+          unifd(gen) < KNOCK_DOOR))
+      return *(door.begin());
+
+  if (hall.size() > 1) hall.erase(pre);
+
+  boost::random::uniform_int_distribution<> unifi(0, hall.size() - 1);
+  return *(boost::next(hall.begin(), unifi(gen)));
 }
 
 Point_2 Particle::advance(const WalkingGraph &g, double duration)
@@ -93,9 +118,9 @@ Point_2 Particle::advance(const WalkingGraph &g, double duration)
     elapsed += left / velocity_;
     history_.push_back(std::make_pair(elapsed, target_));
 
-    Vertex tmp = source_;
+    Vertex pre = source_;
     source_ = target_;
-    target_ = random_next(source_, g, tmp);
+    target_ = random_next(source_, g, pre);
     left = g.weight(source_, target_);
     dist -= left;
   }

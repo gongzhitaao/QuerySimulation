@@ -15,5 +15,7 @@ extern const int NUM_TIMESTAMP;
 extern const int NUM_TEST_PER_TIMESTAMP;
 extern const double RADIUS;
 extern const double UNIT_LENGTH;
+extern const double KNOCK_DOOR;
+extern const double ENTER_ROOM;
 
 #endif  // DEFS_H_

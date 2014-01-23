@@ -32,7 +32,7 @@ class Particle
   const int id() const { return id_; }
 
  private:
-  Vertex random_next(const Vertex v, const WalkingGraph &g, const Vertex u = NullVertex) const;
+  Vertex random_next(Vertex cur, const WalkingGraph &g, Vertex pre = NullVertex) const;
 
   static double unit_;
 

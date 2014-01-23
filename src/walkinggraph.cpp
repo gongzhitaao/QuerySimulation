@@ -88,7 +88,7 @@ void WalkingGraph::build_index(double unit)
           end = start;
           start = p;
         }
-        int y0 = std::ceil(1.0 * start.y() / unit);
+        int y0 = std::ceil(start.y() / unit);
         int count = (end.y() - y0 * unit) / unit;
         for (int dy = 0; dy <= count; ++dy) {
           indices.push_back(points.size());
@@ -100,7 +100,7 @@ void WalkingGraph::build_index(double unit)
           end = start;
           start = p;
         }
-        int x0 = std::ceil(1.0 * start.x() / unit);
+        int x0 = std::ceil(start.x() / unit);
         int count = (end.x() - x0 * unit) / unit;
         for (int dx = 0; dx <= count; ++dx) {
           indices.push_back(points.size());
@@ -117,11 +117,13 @@ void WalkingGraph::build_index(double unit)
 
 int WalkingGraph::detected(const Point_2 &p, double r, int id)
 {
-  K_neighbor_search search(readertree_, p, 1);
+  int ind = id - 1;;
 
-  if (search.begin() == search.end()) return -1;
-
-  int ind = boost::get<1>(search.begin()->first);
+  if (id <= 0) {
+    K_neighbor_search search(readertree_, p, 1);
+    if (search.begin() == search.end()) return -1;
+    ind = boost::get<1>(search.begin()->first);
+  }
 
   return (CGAL::squared_distance(p, readers_[ind].center) <= r * r) ? ind + 1 : -1;
 }
