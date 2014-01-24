@@ -1,13 +1,11 @@
-#include <algorithm>
-#include <cmath>
-#include <fstream>
+#include "walkinggraph.h"
 
-#include <boost/iterator/counting_iterator.hpp>
+#include <cmath>
+
 #include <boost/property_map/property_map.hpp>
 #include <boost/graph/astar_search.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 
-#include "walkinggraph.h"
 #include "defs.h"
 
 namespace simsys {

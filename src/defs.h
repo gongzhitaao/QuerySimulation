@@ -1,5 +1,7 @@
-#ifndef DEFS_H_
-#define DEFS_H_
+#ifndef SRC_DEFS_H_
+#define SRC_DEFS_H_
+
+#pragma once
 
 #include <boost/random.hpp>
 #include <boost/random/random_device.hpp>
@@ -18,4 +20,4 @@ extern const double UNIT_LENGTH;
 extern const double KNOCK_DOOR;
 extern const double ENTER_ROOM;
 
-#endif  // DEFS_H_
+#endif  // SRC_DEFS_H_

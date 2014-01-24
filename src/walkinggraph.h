@@ -5,20 +5,16 @@
 
 #include <map>
 #include <vector>
-#include <utility>
 
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 
 #include <CGAL/Cartesian.h>
-#include <CGAL/Range_segment_tree_traits.h>
-#include <CGAL/Range_tree_k.h>
 #include <CGAL/Search_traits_2.h>
 #include <CGAL/Search_traits_adapter.h>
 #include <CGAL/Orthogonal_k_neighbor_search.h>
 #include <CGAL/property_map.h>
 #include <CGAL/Fuzzy_iso_box.h>
-
 
 namespace simsys {
 

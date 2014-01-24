@@ -1,12 +1,11 @@
 #ifndef SRC_PARTICLE_H_
 #define SRC_PARTICLE_H_
 
+#pragma once
+
 #include <iostream>
 #include <vector>
 #include <utility>  // std::pair
-
-#include <boost/random.hpp>
-#include <boost/random/normal_distribution.hpp>
 
 #include "walkinggraph.h"
 

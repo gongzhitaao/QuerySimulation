@@ -1,11 +1,12 @@
+#include "particle.h"
+
+#include <iostream>
+
 #include <boost/graph/random.hpp>
 #include <boost/random.hpp>
 #include <boost/random/normal_distribution.hpp>
 
-#include "particle.h"
 #include "defs.h"
-
-#include <iostream>
 
 extern boost::random::mt19937 gen;
 
