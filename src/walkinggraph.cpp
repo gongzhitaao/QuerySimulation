@@ -67,7 +67,7 @@ void WalkingGraph::build_index(double unit)
   // Build the anchor points' index.
   {
     typedef K::Segment_2 Segment_2;
-    const Segment_2 Vertical(Point_2(0, 0), Point_2(0, 1.0));
+    const Segment_2 Vertical(Point_2(0.0, 0.0), Point_2(0.0, 1.0));
 
     std::vector<Point_2> points;
     std::vector<int> indices;
@@ -88,7 +88,7 @@ void WalkingGraph::build_index(double unit)
         int count = (end.y() - y0 * unit) / unit;
         for (int dy = 0; dy <= count; ++dy) {
           indices.push_back(points.size());
-          points.push_back(Point_2(start.x(), y0 + dy * unit));
+          points.push_back(Point_2(start.x(), (y0 + dy) * unit));
         }
       } else {
         if (start.x() > end.x()) {
@@ -100,10 +100,11 @@ void WalkingGraph::build_index(double unit)
         int count = (end.x() - x0 * unit) / unit;
         for (int dx = 0; dx <= count; ++dx) {
           indices.push_back(points.size());
-          points.push_back(Point_2(x0 + dx * unit, start.y()));
+          points.push_back(Point_2((x0 + dx) * unit, start.y()));
         }
       }
     }
+
     anchortree_.clear();
     anchortree_.insert(
         boost::make_zip_iterator(boost::make_tuple(points.begin(), indices.begin())),

@@ -5,10 +5,7 @@
 #include <vector>
 #include <utility>
 
-#include <boost/random.hpp>
-#include <boost/random/normal_distribution.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/iterator/zip_iterator.hpp>
 
 #include "defs.h"
 #include "walkinggraph.h"
@@ -138,95 +135,12 @@ int main()
   //   std::cout << std::endl;
   // }
 
-  const std::vector<double> ratios = {
-    0.01, 0.03, 0.1,
-    0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
-  };
-
-  std::vector<double> hitrates(ratios.size());
-
-  boost::random::uniform_real_distribution<> unifd(50.0, DURATION);
-  for (int i = 0; i < NUM_TIMESTAMP; ++i) {
-
-    int timestamp = unifd(gen);
-
-    AnchorMap anchors;
-    simsys::Tree objecttree;
-    {
-      std::vector<simsys::Point_2> points;
-      std::vector<int> indices;
-      for (int j = 0; j < NUM_OBJECT; ++j) {
-        predict(g, objects[j].id(), readings[j], timestamp, anchors);
-        points.push_back(objects[j].pos(g));
-        indices.push_back(objects[j].id());
-      }
-      objecttree.insert(
-          boost::make_zip_iterator(boost::make_tuple(points.begin(), indices.begin())),
-          boost::make_zip_iterator(boost::make_tuple(points.end(), indices.end())));
-    }
-
-    for (size_t j = 0; j < ratios.size(); ++j) {
-      for (int test = 0; test < NUM_TEST_PER_TIMESTAMP; ++test) {
-        // First, adjust the query window.
-        simsys::IsoRect_2 win = random_window(ratios[j], xmax, ymax);
-        std::vector<std::pair<simsys::Fuzzy_iso_box, double> >
-            win_rooms = intersect_room(win, rooms),
-            win_halls = intersect_hall(win, halls);
-
-        // Do the query on real data as well as fake data.
-        std::vector<simsys::Point_and_int> real_results;
-        std::vector<simsys::Point_and_int> enclosed_anchors;
-
-        for (size_t k = 0; k < win_rooms.size(); ++k) {
-          objecttree.search(std::back_inserter(real_results), win_rooms[k].first);
-          std::vector<simsys::Point_and_int> tmp = g.anchors(win_rooms[k].first);
-          enclosed_anchors.insert(enclosed_anchors.end(), tmp.begin(), tmp.end());
-        }
-
-        for (size_t k = 0; k < win_halls.size(); ++k) {
-          objecttree.search(std::back_inserter(real_results), win_halls[k].first);
-          std::vector<simsys::Point_and_int> tmp = g.anchors(win_halls[k].first);
-          enclosed_anchors.insert(enclosed_anchors.end(), tmp.begin(), tmp.end());
-        }
-
-        std::map<int, double> fake_results;
-        for (size_t k = 0; k < enclosed_anchors.size(); ++k) {
-          int ind = boost::get<1>(enclosed_anchors[k]);
-          for (auto it = anchors[ind].cbegin(); it != anchors[ind].cend(); ++it)
-            fake_results[it->first] += it->second;
-        }
-
-        std::set<int> real;
-        for (size_t k = 0; k < real_results.size(); ++k)
-          real.insert(boost::get<1>(real_results[k]));
-
-        int hit = 0;
-        for (auto it = fake_results.cbegin(); it != fake_results.end(); ++it)
-          if (real.end() != real.find(it->first)) ++hit;
-
-        hitrates[j] += 1.0 * hit / real.size();
-      }
-    }
-
-    // std::map<int, int> test;
-
-    // for (auto it = anchors.begin(); it != anchors.end(); ++it) {
-    //   for (auto i = it->second.begin(); i != it->second.end(); ++i) {
-    //     test[i->first] += i->second;
-    //   }
-    // }
-
-    // for (auto it = test.begin(); it != test.end(); ++it)
-    //   cout << it->first << ' ' << it->second << endl;
-
-  }
-
-  for (size_t i = 0; i < hitrates.size(); ++i)
-    hitrates[i] /= NUM_TEST_PER_TIMESTAMP * NUM_TIMESTAMP;
+  std::vector<double> hitrates =
+      range_query_hitrate_vs_windowsize(g, objects, readings, rooms, halls, xmax, ymax);
 
   std::ofstream of("hitrate.txt");
   for (size_t i = 0; i < hitrates.size(); ++i)
-    of << ratios[i] << ' ' << hitrates[i] << endl;
+    of << WINDOW_RATIOS[i] << ' ' << hitrates[i] << endl;
   of.close();
 
   return 0;

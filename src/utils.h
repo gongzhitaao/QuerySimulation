@@ -29,4 +29,13 @@ std::vector<std::pair<simsys::Fuzzy_iso_box, double> >
 intersect_hall(const simsys::IsoRect_2 &win,
                const std::vector<std::pair<simsys::IsoRect_2, int> > &halls);
 
+std::vector<double>
+range_query_hitrate_vs_windowsize(
+    simsys::WalkingGraph &g,
+    const std::vector<simsys::Particle> &objects,
+    const std::vector<std::vector<int> > &readings,
+    const std::vector<simsys::IsoRect_2> &rooms,
+    const std::vector<std::pair<simsys::IsoRect_2, int> > &halls,
+    double xmax, double ymax);
+
 #endif  // SRC_UTILS_H_
