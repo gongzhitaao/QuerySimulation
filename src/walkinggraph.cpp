@@ -16,10 +16,13 @@ WalkingGraph::WalkingGraph()
     , colors_(boost::get(boost::vertex_color, g_))
     , coords_(boost::get(vertex_coord_t(), g_))
     , weights_(boost::get(boost::edge_weight, g_))
+    , xmax_(0.0)
+    , ymax_(0.0)
 {
 }
 
-void WalkingGraph::add_vertex(int id, double x, double y, vertex_color_enum c)
+void
+WalkingGraph::add_vertex(int id, double x, double y, vertex_color_enum c)
 {
   Vertex u = boost::add_vertex(g_);
   colors_[u] = c;
@@ -28,7 +31,8 @@ void WalkingGraph::add_vertex(int id, double x, double y, vertex_color_enum c)
   labels_[u] = id;
 }
 
-void WalkingGraph::add_edge(int src, int des)
+void
+WalkingGraph::add_edge(int src, int des)
 {
   Vertex u = vertices_[src];
   Vertex v = vertices_[des];
@@ -36,7 +40,8 @@ void WalkingGraph::add_edge(int src, int des)
   weights_[e] = std::sqrt(CGAL::squared_distance(coords_[u], coords_[v]));
 }
 
-void WalkingGraph::add_reader(double x, double y, int v1, int v2)
+void
+WalkingGraph::add_reader(double x, double y, int v1, int v2)
 {
   Reader rd;
   rd.center = Point_2(x, y);
@@ -48,7 +53,22 @@ void WalkingGraph::add_reader(double x, double y, int v1, int v2)
   readers_.push_back(rd);
 }
 
-void WalkingGraph::build_index(double unit)
+void
+WalkingGraph::add_room(int id, double x0, double y0, double x1, double y1)
+{
+  rooms_.push_back(IsoRect_2(x0, y0, x1, y1));
+  if (x1 > xmax_) xmax_ = x1;
+  if (y1 > ymax_) ymax_ = y1;
+}
+
+void
+WalkingGraph::add_hall(double x0, double y0, double x1, double y1, int dir)
+{
+  halls_.push_back(std::make_pair(IsoRect_2(x0, y0, x1, y1), dir));
+}
+
+void
+WalkingGraph::build_index(double unit)
 {
   // Build the readers' index.
   {
@@ -112,7 +132,8 @@ void WalkingGraph::build_index(double unit)
   }
 }
 
-int WalkingGraph::detected(const Point_2 &p, double r, int id)
+int
+WalkingGraph::detected(const Point_2 &p, double r, int id)
 {
   int ind = id - 1;;
 
@@ -124,18 +145,72 @@ int WalkingGraph::detected(const Point_2 &p, double r, int id)
   return (CGAL::squared_distance(p, readers_[ind].center) <= r * r) ? ind + 1 : -1;
 }
 
-int WalkingGraph::align(const Point_2 &p)
+int
+WalkingGraph::align(const Point_2 &p)
 {
   K_neighbor_search search(anchortree_, p, 1);
   Point_2 center = boost::get<0>(search.begin()->first);
   return boost::get<1>(search.begin()->first);
 }
 
-std::vector<Point_and_int> WalkingGraph::anchors(const Fuzzy_iso_box &win)
+std::vector<Point_and_int>
+WalkingGraph::anchors(const Fuzzy_iso_box &win)
 {
   std::vector<Point_and_int> res;
   anchortree_.search(std::back_inserter(res), win);
   return res;
+}
+
+std::vector<std::pair<Fuzzy_iso_box, double> >
+WalkingGraph::random_window(double ratio) const
+{
+  double r = 1 - std::sqrt(ratio);
+  boost::random::uniform_real_distribution<>
+      unifx(0, xmax_ * r), unify(0, ymax_ * r);
+
+  double xmin = unifx(gen), ymin = unify(gen);
+
+  IsoRect_2 win = IsoRect_2(xmin, ymin,
+                            xmin + xmax_ * (1 - r),
+                            ymin + ymax_ * (1 - r));
+
+  std::vector<std::pair<Fuzzy_iso_box, double> > results;
+
+  // Intersection with rooms
+  for (size_t i = 0; i < rooms_.size(); ++i) {
+    auto res = CGAL::intersection(win, rooms_[i]);
+    // if the query intersects with a room, then the intersected part
+    // extends to the whole room.
+    if (res) {
+      const IsoRect_2 tmp = *boost::get<IsoRect_2>(&*res);
+      const IsoRect_2 room = rooms_[i];
+      results.push_back(std::make_pair(Fuzzy_iso_box(room.min(), room.max()),
+                                       tmp.area() / room.area()));
+    }
+  }
+
+  // Intersection with halls.
+  for (size_t i = 0; i < halls_.size(); ++i) {
+    auto res = CGAL::intersection(win, halls_[i].first);
+    if (res) {
+      const IsoRect_2 tmp = *boost::get<IsoRect_2>(&*res);
+      const IsoRect_2 hall = halls_[i].first;
+      if (0 == halls_[i].second)
+        results.push_back(std::make_pair(
+            Fuzzy_iso_box(
+                Point_2(tmp.xmin(), hall.ymin()),
+                Point_2(tmp.xmax(), hall.ymax())),
+            (tmp.ymax() - tmp.ymin()) / (hall.ymax() - hall.ymax())));
+      else
+        results.push_back(std::make_pair(
+            Fuzzy_iso_box(
+                Point_2(hall.xmin(), tmp.ymin()),
+                Point_2(hall.xmax(), tmp.ymax())),
+            (tmp.xmax() - tmp.xmin()) / (hall.xmax() - hall.xmin())));
+    }
+  }
+
+  return results;
 }
 
 struct found_goal {};
@@ -172,7 +247,8 @@ class heuristic : public boost::astar_heuristic<Graph, int>
   const CoordMap &coord_;
 };
 
-std::vector<Vertex> WalkingGraph::path(Vertex source, Vertex target) const
+std::vector<Vertex>
+WalkingGraph::path(Vertex source, Vertex target) const
 {
   std::vector<Vertex> p(boost::num_vertices(g_));
   astar_goal_visitor<Vertex> visitor(source);

@@ -14,7 +14,8 @@ namespace simsys {
 
 double Particle::unit_ = 1.0;
 
-inline Point_2 linear_interpolate(const Point_2 &p1, const Point_2 &p2, double r)
+inline Point_2
+linear_interpolate(const Point_2 &p1, const Point_2 &p2, double r)
 {
   return p1 + (p2 - p1) * r;
 }
@@ -68,7 +69,8 @@ Particle::Particle(const Particle &other)
 // particle came from is present, then the randomly chosen vertex may
 // not be u unless the out degree of v is only one in which we have no
 // choice.  In this way, the particle preserves its direction.
-Vertex Particle::random_next(Vertex cur, const WalkingGraph &g, Vertex pre) const
+Vertex
+Particle::random_next(Vertex cur, const WalkingGraph &g, Vertex pre) const
 {
   std::set<Vertex> hall, door, room;
   auto pairit = boost::out_edges(cur, g());
@@ -107,7 +109,8 @@ Vertex Particle::random_next(Vertex cur, const WalkingGraph &g, Vertex pre) cons
   return *(boost::next(hall.begin(), unifi(gen)));
 }
 
-Point_2 Particle::advance(const WalkingGraph &g, double duration)
+Point_2
+Particle::advance(const WalkingGraph &g, double duration)
 {
   double w = g.weight(source_, target_);
   double elapsed = history_.back().first + w * p_ / velocity_,
@@ -130,7 +133,8 @@ Point_2 Particle::advance(const WalkingGraph &g, double duration)
   return linear_interpolate(g.coord(source_), g.coord(target_), p_);
 }
 
-Point_2 Particle::pos(const WalkingGraph &g, double t) const
+Point_2
+Particle::pos(const WalkingGraph &g, double t) const
 {
 
   Point_2 p1, p2;
@@ -173,16 +177,18 @@ Point_2 Particle::pos(const WalkingGraph &g, double t) const
   return linear_interpolate(p1, p2, ratio);
 }
 
-Trace Particle::pos(const WalkingGraph &g, double start, double duration, int count) const
+std::vector<std::pair<double, Point_2> >
+Particle::pos(const WalkingGraph &g, double start, double duration, int count) const
 {
   double step = duration / count;
-  Trace res;
+  std::vector<std::pair<double, Point_2> > res;
   for (int i = 0; i < count; ++i)
     res.push_back(std::make_pair(start + i * step, pos(g, start + i * step)));
   return res;
 }
 
-void Particle::print(const WalkingGraph &g) const
+void
+Particle::print(const WalkingGraph &g) const
 {
   for (size_t i = 0; i < history_.size(); ++i)
     std::cout << history_[i].first << ' ' << g.label(history_[i].second) << std::endl;
