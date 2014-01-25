@@ -1,16 +1,23 @@
 #include "utils.h"
 
+#include <algorithm>
 #include <list>
 #include <map>
 #include <set>
 #include <fstream>
 
 #include <boost/algorithm/string.hpp>
+
 #include <boost/random.hpp>
 #include <boost/random/normal_distribution.hpp>
+
 #include <boost/iterator/zip_iterator.hpp>
 
-#include "defs.h"
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
+
+#include "param.h"
 
 void
 build_graph(simsys::WalkingGraph &g)
@@ -186,14 +193,39 @@ predict(simsys::WalkingGraph &g, int id,
   return true;
 }
 
-std::vector<double>
-range_query_hitrate_vs_windowsize(
+double divergence(const std::set<int> &real, const std::map<int, double> &fake)
+{
+  return 0.0;
+}
+
+double hitrate(const std::set<int> &real, const std::map<int, double> &fake)
+{
+  if (real.size() == 0) return 0.0;
+
+  int hit = 0;
+  for (auto it = fake.cbegin(); it != fake.end(); ++it) {
+    if (real.end() != real.find(it->first) &&
+        it->second >= THRESHOLD)
+      ++hit;
+  }
+  return 1.0 * hit / real.size();
+}
+
+double (* const Measure[])
+(const std::set<int> &, const std::map<int, double> &) = {divergence, hitrate};
+
+std::vector<std::pair<double, double> >
+range_query_windowsize(
     simsys::WalkingGraph &g,
     const std::vector<simsys::Particle> &objects,
-    const std::vector<std::vector<int> > &readings)
+    const std::vector<std::vector<int> > &readings,
+    const std::vector<double> &winsizes,
+    Measurement m)
 {
-  std::vector<double> hitrates(WINDOW_RATIOS.size());
-  std::vector<int> invalid(WINDOW_RATIOS.size(), 0);
+  typedef boost::accumulators::accumulator_set<
+    double, boost::accumulators::stats<
+      boost::accumulators::tag::variance(boost::accumulators::lazy)> > accumulator;
+  std::vector<accumulator> stats(winsizes.size());
 
   boost::random::uniform_real_distribution<> unifd(50.0, DURATION);
   for (int i = 0; i < NUM_TIMESTAMP; ++i) {
@@ -216,12 +248,12 @@ range_query_hitrate_vs_windowsize(
           boost::make_zip_iterator(boost::make_tuple(points.end(), indices.end())));
     }
 
-    for (size_t j = 0; j < WINDOW_RATIOS.size(); ++j) {
+    for (size_t j = 0; j < winsizes.size(); ++j) {
       for (int test = 0; test < NUM_TEST_PER_TIMESTAMP; ++test) {
         // First, adjust the query window.
 
         std::vector<std::pair<simsys::Fuzzy_iso_box, double> >
-            wins = g.random_window(WINDOW_RATIOS[j]);
+            wins = g.random_window(winsizes[j]);
 
         // Do the query on real data as well as fake data.
         std::vector<simsys::Point_and_int> real_results;
@@ -233,32 +265,29 @@ range_query_hitrate_vs_windowsize(
           enclosed_anchors.insert(enclosed_anchors.end(), tmp.begin(), tmp.end());
         }
 
-        std::map<int, double> fake_results;
-        for (size_t k = 0; k < enclosed_anchors.size(); ++k) {
-          int ind = boost::get<1>(enclosed_anchors[k]);
-          for (auto it = anchors[ind].cbegin(); it != anchors[ind].cend(); ++it)
-            fake_results[it->first] += it->second;
-        }
-
         std::set<int> real;
         for (size_t k = 0; k < real_results.size(); ++k)
           real.insert(boost::get<1>(real_results[k]));
 
-        if (real.size() == 0) ++invalid[j];
+        std::map<int, double> fake;
+        for (size_t k = 0; k < enclosed_anchors.size(); ++k) {
+          int ind = boost::get<1>(enclosed_anchors[k]);
+          for (auto it = anchors[ind].cbegin(); it != anchors[ind].cend(); ++it)
+            fake[it->first] += it->second;
+        }
 
-        int hit = 0;
-        for (auto it = fake_results.cbegin(); it != fake_results.end(); ++it)
-          if (real.end() != real.find(it->first) &&
-              it->second >= THRESHOLD)
-            ++hit;
-
-        hitrates[j] += real.size() > 0 ? 1.0 * hit / real.size() : 0.0;
+        if (real.size() > 0)
+          stats[j](Measure[m](real, fake));
       }
     }
   }
 
-  for (size_t i = 0; i < hitrates.size(); ++i)
-    hitrates[i] /= (NUM_TEST_PER_TIMESTAMP * NUM_TIMESTAMP - invalid[i]);
-
-  return hitrates;
+  std::vector<std::pair<double, double> > results;
+  std::transform(stats.begin(), stats.end(), std::back_inserter(results),
+                 [] (accumulator &acc) {
+                   return std::make_pair(
+                       boost::accumulators::mean(acc),
+                       std::sqrt(boost::accumulators::variance(acc)));
+                 });
+  return results;
 }

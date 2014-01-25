@@ -2,7 +2,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 
 add_executable(test_simsystem test_simsystem.cpp)
 
-target_link_libraries(test_simsystem defs)
+target_link_libraries(test_simsystem param)
 target_link_libraries(test_simsystem particle)
 target_link_libraries(test_simsystem walkinggraph)
 target_link_libraries(test_simsystem utils)

@@ -6,7 +6,7 @@
 #include <boost/graph/astar_search.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 
-#include "defs.h"
+#include "param.h"
 
 namespace simsys {
 

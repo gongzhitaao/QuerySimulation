@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -5,7 +6,7 @@
 #include <vector>
 #include <utility>
 
-#include "defs.h"
+#include "param.h"
 #include "walkinggraph.h"
 #include "particle.h"
 #include "utils.h"
@@ -45,13 +46,17 @@ int main()
   //   std::cout << std::endl;
   // }
 
-  std::vector<double> hitrates =
-      range_query_hitrate_vs_windowsize(g, objects, readings);
+  std::vector<std::pair<double, double> > hitrates =
+      range_query_windowsize(g, objects, readings, WINDOW_RATIOS, HitRate);
 
-  std::ofstream of("hitrate.txt");
-  for (size_t i = 0; i < hitrates.size(); ++i)
-    of << WINDOW_RATIOS[i] << ' ' << hitrates[i] << endl;
-  of.close();
+  std::ofstream fout("hitrate_winsize.txt");
+  char msg[64];
+  for (size_t i = 0; i < hitrates.size(); ++i) {
+    sprintf(msg, "%.02f %.6f %.6f",
+            WINDOW_RATIOS[i], hitrates[i].first, hitrates[i].second);
+    fout << msg << endl;
+  }
+  fout.close();
 
   return 0;
 }
