@@ -9,10 +9,12 @@
 #include "walkinggraph.h"
 #include "particle.h"
 
-typedef std::map<int, std::map<int, double> > AnchorMap;
+void build_graph(simsys::WalkingGraph &g);
 
 std::vector<std::vector<int> >
 detect(simsys::WalkingGraph &g, const std::vector<simsys::Particle> &particles);
+
+typedef std::map<int, std::map<int, double> > AnchorMap;
 
 bool
 predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
@@ -33,9 +35,6 @@ std::vector<double>
 range_query_hitrate_vs_windowsize(
     simsys::WalkingGraph &g,
     const std::vector<simsys::Particle> &objects,
-    const std::vector<std::vector<int> > &readings,
-    const std::vector<simsys::IsoRect_2> &rooms,
-    const std::vector<std::pair<simsys::IsoRect_2, int> > &halls,
-    double xmax, double ymax);
+    const std::vector<std::vector<int> > &readings);
 
 #endif  // SRC_UTILS_H_

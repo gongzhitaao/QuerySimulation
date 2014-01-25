@@ -4,6 +4,7 @@
 #include <map>
 #include <set>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/random.hpp>
 #include <boost/random/normal_distribution.hpp>
 #include <boost/iterator/zip_iterator.hpp>
@@ -12,6 +13,95 @@
 
 // debugging
 #include <fstream>
+
+void build_graph(simsys::WalkingGraph &g)
+{
+  const std::string Commenter("//");
+  const std::string DataRoot("/home/gongzhitaao/Documents/simsystem/data/jiao/");
+
+  // Read in vertices for walking graph.
+  {
+    std::ifstream fin(DataRoot + "node.txt");
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      int id, type;
+      double x, y;
+      ss >> id >> x >> y >> type;
+      g.add_vertex(id, x, y, (simsys::vertex_color_enum) type);
+    }
+    fin.close();
+  }
+
+  // Read in edge for walking graph and construct anchor points.
+  // Anchor points are constructed based on the assumption that
+  // walking graph edge is parallel to X or Y axis.
+  {
+    std::ifstream fin(DataRoot + "edge.txt");
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      int v1, v2;
+      ss >> v1 >> v2;
+      g.add_edge(v1, v2);
+    }
+    fin.close();
+  }
+
+  // Read in RFID readers.
+  {
+    std::ifstream fin(DataRoot + "rfid2.txt");
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      int id, v1, v2;
+      double x, y;
+      ss >> id >> x >> y >> v1 >> v2;
+      g.add_reader(x, y, v1, v2);
+    }
+    fin.close();
+  }
+
+  // Read in rooms configuration.
+  {
+    std::ifstream fin(DataRoot + "room.txt");
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      double x0, y0, x1, y1;
+      int id;
+      ss >> id >> x0 >> y0 >> x1 >> y1;
+      g.add_room(id, x0, y0, x1, y1);
+    }
+    fin.close();
+  }
+
+  // Read in halls configuration
+  {
+    std::ifstream fin(DataRoot + "hall.txt");
+    std::string line;
+    while (std::getline(fin, line)) {
+      boost::algorithm::trim_left(line);
+      if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
+      std::stringstream ss(line);
+      double x0, y0, x1, y1;
+      int dir;
+      ss >> x0 >> y0 >> x1 >> y1 >> dir;
+      g.add_hall(x0, y0, x1, y1, dir);
+    }
+    fin.close();
+  }
+
+  g.build_index(UNIT_LENGTH);
+}
 
 // Generate readings for each objects
 std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
@@ -94,69 +184,11 @@ bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
   return true;
 }
 
-simsys::IsoRect_2
-random_window(double ratio, double xmax, double ymax)
-{
-  double r = 1 - std::sqrt(ratio);
-  boost::random::uniform_real_distribution<> unifx(0, xmax * r), unify(0, ymax * r);
-  double xmin = unifx(gen), ymin = unify(gen);
-  return simsys::IsoRect_2(xmin, ymin, xmin + xmax * (1 - r), ymin + ymax * (1 - r));
-}
-
-std::vector<std::pair<simsys::Fuzzy_iso_box, double> >
-intersect_room(const simsys::IsoRect_2 &win,
-               const std::vector<simsys::IsoRect_2> &rooms)
-{
-  std::vector<std::pair<simsys::Fuzzy_iso_box, double> > results;
-  for (size_t i = 0; i < rooms.size(); ++i) {
-    auto res = CGAL::intersection(win, rooms[i]);
-    // if the query intersects with a room, then the intersected part
-    // extends to the whole room.
-    if (res) {
-      const simsys::IsoRect_2 tmp = *boost::get<simsys::IsoRect_2>(&*res);
-      const simsys::IsoRect_2 room = rooms[i];
-      results.push_back(std::make_pair(simsys::Fuzzy_iso_box(room.min(), room.max()),
-                                       tmp.area() / room.area()));
-    }
-  }
-  return results;
-}
-
-std::vector<std::pair<simsys::Fuzzy_iso_box, double> >
-intersect_hall(const simsys::IsoRect_2 &win,
-               const std::vector<std::pair<simsys::IsoRect_2, int> > &halls)
-{
-  std::vector<std::pair<simsys::Fuzzy_iso_box, double> > results;
-  for (size_t i = 0; i < halls.size(); ++i) {
-    auto res = CGAL::intersection(win, halls[i].first);
-    if (res) {
-      const simsys::IsoRect_2 tmp = *boost::get<simsys::IsoRect_2>(&*res);
-      const simsys::IsoRect_2 hall = halls[i].first;
-      if (0 == halls[i].second)
-        results.push_back(std::make_pair(
-            simsys::Fuzzy_iso_box(
-                simsys::Point_2(tmp.xmin(), hall.ymin()),
-                simsys::Point_2(tmp.xmax(), hall.ymax())),
-            (tmp.ymax() - tmp.ymin()) / (hall.ymax() - hall.ymax())));
-      else
-        results.push_back(std::make_pair(
-            simsys::Fuzzy_iso_box(
-                simsys::Point_2(hall.xmin(), tmp.ymin()),
-                simsys::Point_2(hall.xmax(), tmp.ymax())),
-            (tmp.xmax() - tmp.xmin()) / (hall.xmax() - hall.xmin())));
-    }
-  }
-  return results;
-}
-
 std::vector<double>
 range_query_hitrate_vs_windowsize(
     simsys::WalkingGraph &g,
     const std::vector<simsys::Particle> &objects,
-    const std::vector<std::vector<int> > &readings,
-    const std::vector<simsys::IsoRect_2> &rooms,
-    const std::vector<std::pair<simsys::IsoRect_2, int> > &halls,
-    double xmax, double ymax)
+    const std::vector<std::vector<int> > &readings)
 {
   std::vector<double> hitrates(WINDOW_RATIOS.size());
 
@@ -184,24 +216,17 @@ range_query_hitrate_vs_windowsize(
     for (size_t j = 0; j < WINDOW_RATIOS.size(); ++j) {
       for (int test = 0; test < NUM_TEST_PER_TIMESTAMP; ++test) {
         // First, adjust the query window.
-        simsys::IsoRect_2 win = random_window(WINDOW_RATIOS[j], xmax, ymax);
+
         std::vector<std::pair<simsys::Fuzzy_iso_box, double> >
-            win_rooms = intersect_room(win, rooms),
-            win_halls = intersect_hall(win, halls);
+            wins = g.random_window(WINDOW_RATIOS[j]);
 
         // Do the query on real data as well as fake data.
         std::vector<simsys::Point_and_int> real_results;
         std::vector<simsys::Point_and_int> enclosed_anchors;
 
-        for (size_t k = 0; k < win_rooms.size(); ++k) {
-          objecttree.search(std::back_inserter(real_results), win_rooms[k].first);
-          std::vector<simsys::Point_and_int> tmp = g.anchors(win_rooms[k].first);
-          enclosed_anchors.insert(enclosed_anchors.end(), tmp.begin(), tmp.end());
-        }
-
-        for (size_t k = 0; k < win_halls.size(); ++k) {
-          objecttree.search(std::back_inserter(real_results), win_halls[k].first);
-          std::vector<simsys::Point_and_int> tmp = g.anchors(win_halls[k].first);
+        for (size_t k = 0; k < wins.size(); ++k) {
+          objecttree.search(std::back_inserter(real_results), wins[k].first);
+          std::vector<simsys::Point_and_int> tmp = g.anchors(wins[k].first);
           enclosed_anchors.insert(enclosed_anchors.end(), tmp.begin(), tmp.end());
         }
 

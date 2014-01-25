@@ -63,25 +63,63 @@ class WalkingGraph
  public:
   WalkingGraph();
 
-  void add_vertex(int id, double x, double y, vertex_color_enum c = HALL);
-  void add_edge(int src, int des);
-  void add_reader(double x, double y, int v1, int v2);
+  void
+  add_vertex(int id, double x, double y, vertex_color_enum c = HALL);
 
-  void build_index(double unit);
-  int detected(const Point_2 &p, double r, int id = -1);
+  void
+  add_edge(int src, int des);
 
-  int align(const Point_2 &p);
-  std::vector<Point_and_int> anchors(const Fuzzy_iso_box &win);
-  std::vector<Vertex> path(Vertex source, Vertex target) const;
+  void
+  add_reader(double x, double y, int v1, int v2);
 
-  UndirectedGraph &operator() () { return g_; }
-  const UndirectedGraph &operator() () const { return g_; }
+  void
+  add_room(int id, double x0, double y0, double x1, double y1);
 
-  int label(Vertex v) const { return labels_[v]; }
-  const Point_2 &coord(Vertex v) const { return coords_[v]; }
-  double weight(Vertex u, Vertex v) const { return weights_[boost::edge(u, v, g_).first]; }
-  const Reader &reader(int i) const { return readers_[i]; }
-  vertex_color_enum color(Vertex v) const { return colors_[v]; }
+  void
+  add_hall(double x0, double y0, double x1, double y1, int dir);
+
+  void
+  build_index(double unit);
+
+  int
+  detected(const Point_2 &p, double r, int id = -1);
+
+  int
+  align(const Point_2 &p);
+
+  std::vector<Point_and_int>
+  anchors(const Fuzzy_iso_box &win);
+
+  std::vector<Vertex>
+  path(Vertex source, Vertex target) const;
+
+  std::vector<std::pair<Fuzzy_iso_box, double> >
+  random_window(double ratio) const;
+
+  UndirectedGraph &
+  operator() () { return g_; }
+  const UndirectedGraph &
+  operator() () const { return g_; }
+
+  int
+  label(Vertex v) const
+  { return labels_[v]; }
+
+  const Point_2 &
+  coord(Vertex v) const
+  { return coords_[v]; }
+
+  double
+  weight(Vertex u, Vertex v) const
+  { return weights_[boost::edge(u, v, g_).first]; }
+
+  const Reader &
+  reader(int i) const
+  { return readers_[i]; }
+
+  vertex_color_enum
+  color(Vertex v) const
+  { return colors_[v]; }
 
  private:
   UndirectedGraph g_;
@@ -93,6 +131,10 @@ class WalkingGraph
 
   std::map<int, Vertex> vertices_;
   std::vector<Reader> readers_;
+  std::vector<IsoRect_2> rooms_;
+  std::vector<std::pair<IsoRect_2, int> > halls_;
+
+  double xmax_, ymax_;
 
   Tree readertree_;
   Tree anchortree_;
