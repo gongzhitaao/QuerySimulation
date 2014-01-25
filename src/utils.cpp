@@ -3,6 +3,7 @@
 #include <list>
 #include <map>
 #include <set>
+#include <fstream>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/random.hpp>
@@ -11,10 +12,8 @@
 
 #include "defs.h"
 
-// debugging
-#include <fstream>
-
-void build_graph(simsys::WalkingGraph &g)
+void
+build_graph(simsys::WalkingGraph &g)
 {
   const std::string Commenter("//");
   const std::string DataRoot("/home/gongzhitaao/Documents/simsystem/data/jiao/");
@@ -104,8 +103,9 @@ void build_graph(simsys::WalkingGraph &g)
 }
 
 // Generate readings for each objects
-std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
-                                      const std::vector<simsys::Particle> &particles)
+std::vector<std::vector<int> >
+detect(simsys::WalkingGraph &g,
+       const std::vector<simsys::Particle> &particles)
 {
   boost::random::uniform_real_distribution<> unifd(0, 1);
   std::vector<std::vector<int> > readings;
@@ -120,8 +120,10 @@ std::vector<std::vector<int> > detect(simsys::WalkingGraph &g,
   return readings;
 }
 
-bool predict(simsys::WalkingGraph &g, int id, const std::vector<int> &reading,
-             double t, AnchorMap &anchors, int limit)
+bool
+predict(simsys::WalkingGraph &g, int id,
+        const std::vector<int> &reading,
+        double t, AnchorMap &anchors, int limit)
 {
   // The number of valid readings, i.e. reading >= 0, in [start, end]
   // is *limit*.
@@ -191,6 +193,7 @@ range_query_hitrate_vs_windowsize(
     const std::vector<std::vector<int> > &readings)
 {
   std::vector<double> hitrates(WINDOW_RATIOS.size());
+  std::vector<int> invalid(WINDOW_RATIOS.size(), 0);
 
   boost::random::uniform_real_distribution<> unifd(50.0, DURATION);
   for (int i = 0; i < NUM_TIMESTAMP; ++i) {
@@ -204,7 +207,7 @@ range_query_hitrate_vs_windowsize(
       std::vector<int> indices;
       for (int j = 0; j < NUM_OBJECT; ++j) {
         predict(g, objects[j].id(), readings[j], timestamp, anchors);
-        points.push_back(objects[j].pos(g));
+        points.push_back(objects[j].pos(g, timestamp));
         indices.push_back(objects[j].id());
       }
 
@@ -241,9 +244,13 @@ range_query_hitrate_vs_windowsize(
         for (size_t k = 0; k < real_results.size(); ++k)
           real.insert(boost::get<1>(real_results[k]));
 
+        if (real.size() == 0) ++invalid[j];
+
         int hit = 0;
         for (auto it = fake_results.cbegin(); it != fake_results.end(); ++it)
-          if (real.end() != real.find(it->first)) ++hit;
+          if (real.end() != real.find(it->first) &&
+              it->second >= THRESHOLD)
+            ++hit;
 
         hitrates[j] += real.size() > 0 ? 1.0 * hit / real.size() : 0.0;
       }
@@ -251,7 +258,7 @@ range_query_hitrate_vs_windowsize(
   }
 
   for (size_t i = 0; i < hitrates.size(); ++i)
-    hitrates[i] /= NUM_TEST_PER_TIMESTAMP * NUM_TIMESTAMP;
+    hitrates[i] /= (NUM_TEST_PER_TIMESTAMP * NUM_TIMESTAMP - invalid[i]);
 
   return hitrates;
 }

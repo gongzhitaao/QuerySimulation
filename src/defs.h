@@ -21,6 +21,7 @@ extern const double RADIUS;
 extern const double UNIT_LENGTH;
 extern const double KNOCK_DOOR;
 extern const double ENTER_ROOM;
+extern const double THRESHOLD;
 
 extern const std::vector<double> WINDOW_RATIOS;
 

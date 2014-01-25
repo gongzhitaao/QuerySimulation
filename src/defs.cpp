@@ -10,9 +10,10 @@ const int NUM_PARTICLE           = 128;   // number of sub-particles each object
 const int NUM_TIMESTAMP          = 10;    // number of timestamps to test against
 const int NUM_TEST_PER_TIMESTAMP = 10;    // number of tests to run for each set of parameters
 const double RADIUS              = 120.0; // detection range of RFID readers
-const double UNIT_LENGTH         = 10.0;  // distance between anchor points along each axis.
+const double UNIT_LENGTH         = 20.0;  // distance between anchor points along each axis.
 const double KNOCK_DOOR          = 0.1;   // probability of entering a room
 const double ENTER_ROOM          = 0.1;   // probability of entering a room
+const double THRESHOLD           = 0.4;   // objects with probability above this is considered
 
 const std::vector<double> WINDOW_RATIOS = {
   0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09,
