@@ -6,7 +6,7 @@
 #include <boost/random.hpp>
 #include <boost/random/normal_distribution.hpp>
 
-#include "defs.h"
+#include "param.h"
 
 extern boost::random::mt19937 gen;
 

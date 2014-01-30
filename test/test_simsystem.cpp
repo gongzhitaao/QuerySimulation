@@ -8,7 +8,7 @@
 #include <boost/random.hpp>
 #include <boost/random/normal_distribution.hpp>
 
-#include "defs.h"
+#include "param.h"
 #include "walkinggraph.h"
 #include "particle.h"
 #include "utils.h"

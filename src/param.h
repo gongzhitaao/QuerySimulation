@@ -11,7 +11,7 @@
 extern boost::random::random_device rd;
 extern boost::random::mt19937 gen;
 
-extern const double HIT_RATE;
+extern const double SUCCESS_RATE;
 extern const int DURATION;
 extern const int NUM_OBJECT;
 extern const int NUM_PARTICLE;
