@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -5,7 +6,7 @@
 #include <vector>
 #include <utility>
 
-#include "defs.h"
+#include "param.h"
 #include "walkinggraph.h"
 #include "particle.h"
 #include "utils.h"
@@ -45,13 +46,45 @@ int main()
   //   std::cout << std::endl;
   // }
 
-  std::vector<double> hitrates =
-      range_query_hitrate_vs_windowsize(g, objects, readings);
+  range_query_windowsize(g, objects, readings, WINDOW_RATIOS);
 
-  std::ofstream of("hitrate.txt");
-  for (size_t i = 0; i < hitrates.size(); ++i)
-    of << WINDOW_RATIOS[i] << ' ' << hitrates[i] << endl;
-  of.close();
+  std::vector<std::pair<double, double> >
+      precision = measure(Precision),
+      recall = measure(Recall),
+      f1score = measure(F1Score);
+
+  {
+    std::ofstream fout("precision.txt");
+    char msg[64];
+    for (size_t i = 0; i < precision.size(); ++i) {
+      sprintf(msg, "%.02f %.6f %.6f",
+              WINDOW_RATIOS[i], precision[i].first, precision[i].second);
+      fout << msg << endl;
+    }
+    fout.close();
+  }
+
+  {
+    std::ofstream fout("recall.txt");
+    char msg[64];
+    for (size_t i = 0; i < recall.size(); ++i) {
+      sprintf(msg, "%.02f %.6f %.6f",
+              WINDOW_RATIOS[i], recall[i].first, recall[i].second);
+      fout << msg << endl;
+    }
+    fout.close();
+  }
+
+  {
+    std::ofstream fout("f1score.txt");
+    char msg[64];
+    for (size_t i = 0; i < f1score.size(); ++i) {
+      sprintf(msg, "%.02f %.6f %.6f",
+              WINDOW_RATIOS[i], f1score[i].first, f1score[i].second);
+      fout << msg << endl;
+    }
+    fout.close();
+  }
 
   return 0;
 }

@@ -1,9 +1,9 @@
-#include "defs.h"
+#include "param.h"
 
 boost::random::random_device rd;
 boost::random::mt19937 gen(rd());
 
-const double HIT_RATE            = 0.99;  // probability of an object in detection range being detected
+const double SUCCESS_RATE        = 0.95;  // probability of an object in detection range being detected
 const int DURATION               = 100;   // length of simulation
 const int NUM_OBJECT             = 100;   // number of moving objects under observation
 const int NUM_PARTICLE           = 128;   // number of sub-particles each object Generate

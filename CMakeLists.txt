@@ -1,6 +1,6 @@
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8)
 
-project (demo)
+project (SimulationSystem)
 
 OPTION(test "Build SimSystem test cases." OFF)
 
