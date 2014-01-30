@@ -1,10 +1,15 @@
 #include "utils.h"
 
 #include <algorithm>
+#include <cmath>
 #include <list>
 #include <map>
 #include <set>
 #include <fstream>
+#include <limits>
+
+#include <boost/bind.hpp>
+#include <boost/ref.hpp>
 
 #include <boost/algorithm/string.hpp>
 
@@ -112,15 +117,15 @@ build_graph(simsys::WalkingGraph &g)
 // Generate readings for each objects
 std::vector<std::vector<int> >
 detect(simsys::WalkingGraph &g,
-       const std::vector<simsys::Particle> &particles)
+       const std::vector<simsys::Particle> &objects)
 {
   boost::random::uniform_real_distribution<> unifd(0, 1);
   std::vector<std::vector<int> > readings;
-  for (size_t i = 0; i < particles.size(); ++i) {
+  for (size_t i = 0; i < objects.size(); ++i) {
     std::vector<int> tmp;
     for (int j = 0; j < DURATION; ++j) {
-      if (unifd(gen) > HIT_RATE) tmp.push_back(-1);
-      else tmp.push_back(g.detected(particles[i].pos(g, j), RADIUS));
+      if (unifd(gen) > SUCCESS_RATE) tmp.push_back(-1);
+      else tmp.push_back(g.detected(objects[i].pos(g, j), RADIUS));
     }
     readings.push_back(tmp);
   }
@@ -193,39 +198,58 @@ predict(simsys::WalkingGraph &g, int id,
   return true;
 }
 
-double divergence(const std::set<int> &real, const std::map<int, double> &fake)
+inline int
+hit(const std::set<int> &real, const std::map<int, double> &fake)
 {
-  return 0.0;
-}
-
-double hitrate(const std::set<int> &real, const std::map<int, double> &fake)
-{
-  if (real.size() == 0) return 0.0;
-
-  int hit = 0;
+  int res = 0;
   for (auto it = fake.cbegin(); it != fake.end(); ++it) {
     if (real.end() != real.find(it->first) &&
         it->second >= THRESHOLD)
-      ++hit;
+      ++res;
   }
-  return 1.0 * hit / real.size();
+  return res;
 }
 
-double (* const Measure[])
-(const std::set<int> &, const std::map<int, double> &) = {divergence, hitrate};
+double
+recall(const std::set<int> &real, const std::map<int, double> &fake)
+{
+  if (real.size() == 0) return 0.0;
+  return 1.0 * hit(real, fake) / real.size();
+}
 
-std::vector<std::pair<double, double> >
+double
+precision(const std::set<int> &real, const std::map<int, double> &fake)
+{
+  if (real.size() == 0) return 0.0;
+  return 1.0 * hit(real, fake) / fake.size();
+}
+
+double
+f1score(const std::set<int> &real, const std::map<int, double> &fake)
+{
+  double a = recall(real, fake);
+  double b = precision(real, fake);
+  return (a + b < std::numeric_limits<double>::epsilon()) ? 0.0
+      : 2.0 * b * a / (b + a);
+}
+
+double (* const Measure_[])
+(const std::set<int> &, const std::map<int, double> &) = {recall, precision, f1score};
+
+std::vector<std::vector<std::pair<double, double> > >
+statistics_(MEASUREMENT);
+
+void
 range_query_windowsize(
     simsys::WalkingGraph &g,
     const std::vector<simsys::Particle> &objects,
     const std::vector<std::vector<int> > &readings,
-    const std::vector<double> &winsizes,
-    Measurement m)
+    const std::vector<double> &winsizes)
 {
   typedef boost::accumulators::accumulator_set<
     double, boost::accumulators::stats<
       boost::accumulators::tag::variance(boost::accumulators::lazy)> > accumulator;
-  std::vector<accumulator> stats(winsizes.size());
+  std::vector<std::vector<accumulator> > stats(MEASUREMENT, std::vector<accumulator>(winsizes.size()));
 
   boost::random::uniform_real_distribution<> unifd(50.0, DURATION);
   for (int i = 0; i < NUM_TIMESTAMP; ++i) {
@@ -276,18 +300,28 @@ range_query_windowsize(
             fake[it->first] += it->second;
         }
 
-        if (real.size() > 0)
-          stats[j](Measure[m](real, fake));
+        if (real.size() > 0) {
+          for (int k = 0; k < MEASUREMENT; ++k)
+            stats[k][j](Measure_[k](real, fake));
+        }
       }
     }
   }
 
-  std::vector<std::pair<double, double> > results;
-  std::transform(stats.begin(), stats.end(), std::back_inserter(results),
-                 [] (accumulator &acc) {
-                   return std::make_pair(
-                       boost::accumulators::mean(acc),
-                       std::sqrt(boost::accumulators::variance(acc)));
-                 });
-  return results;
+  for (int i = 0; i < MEASUREMENT; ++i) {
+    std::vector<std::pair<double, double> > results;
+    std::transform(stats[i].begin(), stats[i].end(), std::back_inserter(results),
+                   [] (accumulator &acc) {
+                     return std::make_pair(
+                         boost::accumulators::mean(acc),
+                         std::sqrt(boost::accumulators::variance(acc)));
+                   });
+    statistics_[i] = results;
+  }
+}
+
+const std::vector<std::pair<double, double> > &
+measure(Measurement m)
+{
+  return statistics_[m];
 }
