@@ -198,30 +198,33 @@ predict(simsys::WalkingGraph &g, int id,
   return true;
 }
 
-inline int
+static std::pair<int, int>
 hit(const std::set<int> &real, const std::map<int, double> &fake)
 {
-  int res = 0;
-  for (auto it = fake.cbegin(); it != fake.end(); ++it) {
-    if (real.end() != real.find(it->first) &&
-        it->second >= THRESHOLD)
-      ++res;
+  int a = 0, b = 0;
+  for (auto it = fake.cbegin(); it != fake.cend(); ++it) {
+    if (it->second >= THRESHOLD) {
+      ++b;
+      if (real.end() != real.find(it->first))
+        ++a;
+    }
   }
-  return res;
+  return std::make_pair(a, b);
 }
 
-double
+static double
 recall(const std::set<int> &real, const std::map<int, double> &fake)
 {
   if (real.size() == 0) return 0.0;
-  return 1.0 * hit(real, fake) / real.size();
+  return 1.0 * hit(real, fake).first / real.size();
 }
 
-double
+static double
 precision(const std::set<int> &real, const std::map<int, double> &fake)
 {
   if (real.size() == 0) return 0.0;
-  return 1.0 * hit(real, fake) / fake.size();
+  std::pair<int, int> count = hit(real, fake);
+  return 0 == count.second ? 0.0 : 1.0 * count.first / count.second;
 }
 
 double
