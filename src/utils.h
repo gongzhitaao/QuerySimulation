@@ -9,8 +9,6 @@
 #include "walkinggraph.h"
 #include "particle.h"
 
-void build_graph(simsys::WalkingGraph &g);
-
 std::vector<std::vector<int> >
 detect(simsys::WalkingGraph &g, const std::vector<simsys::Particle> &objects);
 

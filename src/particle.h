@@ -9,22 +9,19 @@
 
 #include "walkinggraph.h"
 
-namespace simsys {
+namespace simulation {
 
 class Particle
 {
  public:
-  Particle(const WalkingGraph &g, int id = -1, double radius = -1.0, int reader = -1);
+  Particle(const WalkingGraph &g, landmark_t pos = {0, 0, -1}, int id = -1);
   Particle(const Particle &other);
 
-  Point_2
+  landmark_t
   advance(const WalkingGraph &g, double duration = -1.0);
 
-  Point_2
+  landmark_t
   pos(const WalkingGraph &g, double t = -1) const;
-
-  std::vector<std::pair<double, Point_2> >
-  pos(const WalkingGraph &g, double start, double duration, int count) const;
 
   static void
   set_unit(double unit)
@@ -34,25 +31,21 @@ class Particle
   get_unit() { return unit_; }
 
   void
-  print(const WalkingGraph &g) const;
+  print(std::ostream &os) const;
 
   const int
   id() const { return id_; }
 
  private:
-  Vertex
-  random_next(Vertex cur, const WalkingGraph &g, Vertex pre = NullVertex) const;
 
   static double unit_;
 
   const int id_;
 
-  Vertex source_;
-  Vertex target_;
+  landmark_t pos_;
   double velocity_;
-  double p_;
 
-  std::vector<std::pair<double, Vertex> > history_;
+  std::vector<std::pair<double, int> > history_;
 };
 
 }
