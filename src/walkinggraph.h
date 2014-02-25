@@ -66,22 +66,16 @@ typedef boost::property_map<UndirectedGraph,
 typedef boost::unordered_map<
   int, std::vector<std::pair<int, double> > > anchor_map_t;
 
-template <typename VertexNameMap>
 struct remove_anchor
 {
   remove_anchor() { }
-  remove_anchor(const VertexNameMap &names)
+  remove_anchor(name_map_t names)
       : names_(names) { }
 
-  template <typename Vertex>
   bool operator () (const Vertex &v) const
   { return names_[v] >= 0; }
 
-  const VertexNameMap &names_;
-};
-
-struct all
-{
+  name_map_t names_;
 };
 
 Point_2
@@ -152,14 +146,17 @@ class WalkingGraph
   insert_anchors(double unit = 20.0);
 
   UndirectedGraph g_;
-  boost::filtered_graph<
-    UndirectedGraph, boost::keep_all, remove_anchor<name_map_t> > fg_;
 
   name_map_t names_;
   coord_map_t coords_;
   color_map_t colors_;
   index_map_t indices_;
   weight_map_t weights_;
+
+  boost::filtered_graph<UndirectedGraph, boost::keep_all,
+                        remove_anchor> fg_;
+  // boost::filtered_graph<
+  //   UndirectedGraph, boost::keep_all, boost::keep_all> fg_;
 
   anchor_map_t anchors_;
   anchor_map_t objects_;

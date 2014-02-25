@@ -20,13 +20,14 @@ using std::cout;
 using std::endl;
 
 WalkingGraph::WalkingGraph()
-    : fg_(make_filtered_graph(
-          g_, boost::keep_all(), remove_anchor<name_map_t>(names_)))
-    , names_(boost::get(boost::vertex_name, g_))
+    : names_(boost::get(boost::vertex_name, g_))
     , coords_(boost::get(vertex_coord_t(), g_))
     , colors_(boost::get(boost::vertex_color, g_))
     , indices_(boost::get(boost::edge_index, g_))
     , weights_(boost::get(boost::edge_weight, g_))
+    , fg_(make_filtered_graph(
+        g_, boost::keep_all(),
+        remove_anchor(boost::get(boost::vertex_name, g_))))
 {
   initialize();
   insert_anchors();
@@ -434,25 +435,31 @@ WalkingGraph::clear_objects()
 
 struct found_knn {};
 
-template <typename Graph>
 struct knn_visitor : public boost::default_bfs_visitor
 {
-  knn_visitor() { }
-  knn_visitor(int k, name_map_t names)
-      : count_(k)
+  // knn_visitor() { }
+  knn_visitor(std::vector<int> &results, int k,
+              name_map_t names)
+      : results_(results)
+      , count_(k)
       , names_(names){ }
 
+  template <typename Graph>
   void
   discover_vertex(const Vertex v, const Graph &g)
   {
-    if (names_[v] >= 1000) {
+    int name = names_[v];
+    if (name >= 1000) {
       --count_;
+
+      results_.push_back(name);
 
       if (0 == count_)
         throw found_knn();
     }
   }
 
+  std::vector<int> &results_;
   int count_;
   name_map_t names_;
 };
@@ -460,7 +467,14 @@ struct knn_visitor : public boost::default_bfs_visitor
 std::vector<int>
 WalkingGraph::nearest_neighbor(int object, int k)
 {
-  return std::vector<int>();
+  std::vector<int> results;
+  knn_visitor vis(results, k, names_);
+  try {
+    boost::breadth_first_search(fg_, vertices_[OBJECT_START + object],
+                                boost::visitor(vis));
+  } catch (found_knn fk) { }
+
+  return results;
 }
 
 void
