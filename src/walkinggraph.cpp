@@ -60,6 +60,7 @@ WalkingGraph::initialize()
   {
     std::ifstream fin(DataRoot + "edge.txt");
     std::string line;
+    int id = 0;
     while (std::getline(fin, line)) {
       boost::algorithm::trim_left(line);
       if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
@@ -67,10 +68,13 @@ WalkingGraph::initialize()
       std::stringstream ss(line);
       int n1, n2;
       ss >> n1 >> n2;
-      int id = 0;
-      boost::add_edge(vertices_[n1], vertices_[n2],
-                      {id++, {std::sqrt(CGAL::squared_distance(
-                          coord(n1), coord(n2)))}}, g_);
+      auto pair = boost::add_edge(
+          vertices_[n1], vertices_[n2],
+          {id, {std::sqrt(CGAL::squared_distance(
+              coord(n1), coord(n2)))}}, g_);
+      if (pair.second)
+        edges_[id] = pair.first;
+      id++;
     }
     fin.close();
   }
@@ -219,9 +223,11 @@ WalkingGraph::insert_anchors(double unit)
       Point_2 p = linear_interpolate(coords_[source], coords_[target],
                                      vec[i].second);
       Vertex v = boost::add_vertex({vec[i].first, {p, {HALL}}}, g_);
-      boost::add_edge(u, v,
-                      {id++, {w * (vec[i].second - vec[i-1].second)}},
-                      g_);
+      auto pair = boost::add_edge(
+          u, v, {id, {w * (vec[i].second - vec[i-1].second)}}, g_);
+      if (pair.second)
+        edges_[id] = pair.first;
+      ++id;
       u = v;
     }
   }
@@ -349,6 +355,114 @@ WalkingGraph::detected_by(const landmark_t &pos, double radius)
   return (*res.begin())->info().first;
 }
 
+static int count_;
+static std::vector<int> edge_with_objects_;
+
+void
+WalkingGraph::insert_objects(const std::vector<landmark_t> &objects)
+{
+  {
+    int id = OBJECT_START;
+    count_ = objects.size();
+    for (size_t i = 0; i < objects.size(); ++i) {
+      landmark_t pos = objects[i];
+      Edge e = boost::edge(vertices_[pos.get<0>()],
+                           vertices_[pos.get<1>()], fg_).first;
+
+      int u = names_[boost::source(e, g_)];
+      if (u == pos.get<1>()) {
+        int t = pos.get<0>();
+        pos.get<0>() = pos.get<1>();
+        pos.get<1>() = t;
+        pos.get<2>() = 1 - pos.get<2>();
+      }
+
+      int ind = indices_[e];
+
+      if (objects_[ind].empty())
+        edge_with_objects_.push_back(ind);
+
+      objects_[ind].push_back(std::make_pair(id + i, pos.get<2>()));
+    }
+  }
+
+  {
+    int id = boost::num_edges(g_);
+    for (auto it = edge_with_objects_.begin();
+         it != edge_with_objects_.end(); ++it) {
+      std::vector<std::pair<int, double> > &vec = objects_[*it];
+      Edge e = edges_[*it];
+      Vertex source = boost::source(e, g_);
+      Vertex target = boost::target(e, g_);
+      double w = weights_[e];
+
+      sort(vec.begin(), vec.end(),
+           [](const std::pair<int, double> &a,
+              const std::pair<int, double> &b) {
+             return a.second < b.second;
+           });
+
+      Vertex u = source;
+      double pre = 0.0;
+      for (auto vit = vec.begin(); vit != vec.end(); ++vit) {
+        Point_2 p = linear_interpolate(
+            coords_[source], coords_[target], vit->second);
+        Vertex v = boost::add_vertex({vit->first, {p, {HALL}}}, g_);
+        auto pair = boost::add_edge(u, v,
+                                 {id, {w * vit->second - pre}}, g_);
+        if (pair.second)
+          edges_[id] = pair.first;
+        ++id;
+
+        pre = w * vit->second;
+      }
+    }
+  }
+}
+
+void
+WalkingGraph::clear_objects()
+{
+  for (int i = OBJECT_START; i < count_; ++i)
+    boost::remove_vertex(vertices_[i], g_);
+
+  for (auto it = edge_with_objects_.begin();
+       it != edge_with_objects_.end(); ++it) {
+    objects_[*it].clear();
+  }
+}
+
+struct found_knn {};
+
+template <typename Graph>
+struct knn_visitor : public boost::default_bfs_visitor
+{
+  knn_visitor() { }
+  knn_visitor(int k, name_map_t names)
+      : count_(k)
+      , names_(names){ }
+
+  void
+  discover_vertex(const Vertex v, const Graph &g)
+  {
+    if (names_[v] >= 1000) {
+      --count_;
+
+      if (0 == count_)
+        throw found_knn();
+    }
+  }
+
+  int count_;
+  name_map_t names_;
+};
+
+std::vector<int>
+WalkingGraph::nearest_neighbor(int object, int k)
+{
+  return std::vector<int>();
+}
+
 void
 WalkingGraph::print(std::ostream &os) const
 {
@@ -356,19 +470,6 @@ WalkingGraph::print(std::ostream &os) const
   for (boost::tie(vi, end) = boost::vertices(g_); vi != end; ++vi)
     os << coords_[*vi] << std::endl;
 }
-
-// int
-// detected(const Point_2 &p, double r, int id)
-// {
-//   int ind = id - 1;;
-
-//   if (id <= 0) {
-//     K_neighbor_search search(readertree_, p, 1);
-//     ind = boost::get<1>(search.begin()->first);
-//   }
-
-//   return (CGAL::squared_distance(p, readers_[ind].center) <= r * r) ? ind + 1 : -1;
-// }
 
 // int
 // align(const Point_2 &p)

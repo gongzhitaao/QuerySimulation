@@ -59,11 +59,12 @@ Simulation_impl_::random_window(double ratio)
 void
 Simulation_impl_::snapshot(double t)
 {
+  std::vector<std::pair<int, landmark_t> > infos;
+
   // construct objects point set for range query
   {
     objectset_.clear();
 
-    std::vector<std::pair<int, landmark_t> > infos;
     std::vector<Point_2> points;
 
     for (auto it = objects_.begin(); it != objects_.end(); ++it) {
@@ -84,6 +85,13 @@ Simulation_impl_::snapshot(double t)
 
   // insert object into graph for nearest neighbor query
   {
+    std::vector<landmark_t> tmp(infos.size());
+    transform(infos.begin(), infos.end(), tmp.begin(),
+              [](const std::pair<int, landmark_t> &p) {
+                return p.second;
+              });
+    g_.clear_objects();
+    g_.insert_objects(tmp);
   }
 }
 

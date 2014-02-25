@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <map>
 #include <vector>
 
 #include <boost/graph/graph_traits.hpp>
@@ -124,8 +123,17 @@ class WalkingGraph
   std::vector<std::pair<IsoRect_2, double> >
   random_window(double ratio) const;
 
+  void
+  insert_objects(const std::vector<landmark_t> &objects);
+
+  void
+  clear_objects();
+
   int
   detected_by(const landmark_t &pos, double radius);
+
+  std::vector<int>
+  nearest_neighbor(int object, int k);
 
   UndirectedGraph
   operator () ()
@@ -135,6 +143,8 @@ class WalkingGraph
   print(std::ostream &os) const;
 
  protected:
+  enum { OBJECT_START=1000 };
+
   void
   initialize();
 
@@ -152,8 +162,10 @@ class WalkingGraph
   weight_map_t weights_;
 
   anchor_map_t anchors_;
+  anchor_map_t objects_;
 
-  std::map<int, Vertex> vertices_;
+  boost::unordered_map<int, Edge> edges_;
+  boost::unordered_map<int, Vertex> vertices_;
 
   Point_set_2 readerset_;
   boost::unordered_map<int, landmark_t> readermap_;
