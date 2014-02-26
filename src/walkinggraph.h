@@ -127,7 +127,7 @@ class WalkingGraph
   detected_by(const landmark_t &pos, double radius);
 
   std::vector<int>
-  nearest_neighbor(int object, int k);
+  nearest_neighbors(int object, int k);
 
   UndirectedGraph
   operator () ()

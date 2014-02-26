@@ -7,6 +7,7 @@
 
 #include "particle.h"
 #include "param.h"
+#include "global.h"
 
 namespace simulation {
 

@@ -4,8 +4,7 @@
 #include <iostream>
 
 #include "param.h"
-#include "walkinggraph.h"
-#include "particle.h"
+#include "simulation.h"
 
 using namespace std;
 
@@ -28,6 +27,12 @@ TEST_F(SimulationTest, particle)
   simulation::Particle p(g);
   p.advance(g, 100);
   p.print(cout);
+}
+
+TEST_F(SimulationTest, nearest_neighbors)
+{
+  using namespace simulation;
+  simulation::Simulation sim(_num_object=10);
 }
 
 int main(int argc, char** argv) {

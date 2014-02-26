@@ -45,35 +45,32 @@ class Simulation_impl_
   random_object();
 
   std::vector<int>
-  nearest_neighbor(int k);
+  nearest_neighbors(int id, int k);
 
   std::map<int, double>
-  nearest_neighbor_pred(int k);
+  nearest_neighbors_pred(int k);
 
  protected:
 
+  Simulation_impl_() {}
+
   template <class ArgumentPack>
-  simulation_impl(const ArgumentPack &args)
+  Simulation_impl_(const ArgumentPack &args)
       : num_object_(args[_num_object])
-      , num_particle_(args[_num_particle])
-      , radius_(args[_radius])
-      , unit_(args[_unit])
-      , knock_door_prob_(args[_knock_door_prob])
-      , enter_room_prob_(args[_enter_room_prob])
-      , threshold_(args[_threshold])
-      , success_rate_(args[_success_rate])
-  {
-    initialize();
-  }
-
-  void
-  initialize();
-
-  void
-  detect();
+      , num_particle_(args[_num_particle | 128])
+      , radius_(args[_radius | 120.0])
+      , unit_(args[_unit | 20])
+      , knock_door_prob_(args[_knock_door_prob | 0.1])
+      , enter_room_prob_(args[_enter_room_prob | 0.1])
+      , threshold_(args[_threshold | 0.4])
+      , success_rate_(args[_success_rate | 0.95])
+  { }
 
   landmark_t
   random_inside_reader(int i) const;
+
+  void
+  detect();
 
  private:
 
@@ -97,15 +94,16 @@ class Simulation : public Simulation_impl_
 {
  public:
   BOOST_PARAMETER_CONSTRUCTOR(
-      myclass, (myclass_impl), tag,
-      (required (num_object,*))
+      Simulation, (Simulation_impl_), tag,
+      (required
+       (num_object, *))
       (optional
-       (num_particle, *, 128)
-       (radius, *, 120.0)
-       (unit, *, 20.0)
-       (knock_door_prob, *, 0.1)
-       (enter_room_prob, *, 0.1),
-       (threshold, *, 0.4)))
+       (num_particle, *)
+       (radius, *)
+       (unit, *)
+       (knock_door_prob, *)
+       (enter_room_prob, *)
+       (threshold, *)))
 };
 
 }

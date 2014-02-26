@@ -3,12 +3,6 @@
 
 #pragma once
 
-#include <boost/random.hpp>
-#include <boost/random/random_device.hpp>
-
-extern boost::random::random_device rd;
-extern boost::random::mt19937 gen;
-
 extern const double SUCCESS_RATE;
 extern const int DURATION;
 extern const int NUM_OBJECT;

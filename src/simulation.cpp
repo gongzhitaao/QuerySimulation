@@ -9,6 +9,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "simulation.h"
+#include "global.h"
 
 namespace simulation {
 
@@ -27,7 +28,7 @@ static Point_set_2 objectset_;
 
 // Generate readings for each objects
 void
-Simulation::detect()
+Simulation_impl_::detect()
 {
   readings_.clear();
   boost::random::uniform_real_distribution<> unifd(0, 1);
@@ -35,7 +36,7 @@ Simulation::detect()
     std::vector<int> tmp;
     for (int j = 0; j < duration_; ++j) {
       if (unifd(gen) > success_rate_) tmp.push_back(-1);
-      else tmp.push_back(g.detected_by(objects[i].pos(g, j), radius));
+      else tmp.push_back(g_.detected_by(objects_[i].pos(g_, j), radius_));
     }
     readings_.push_back(tmp);
   }
@@ -44,16 +45,16 @@ Simulation::detect()
 landmark_t
 Simulation_impl_::random_inside_reader(int i) const
 {
-  pos = g_.reader_pos(i);
-  Particle p(pos);
+  landmark_t pos = g_.reader_pos(i);
+  Particle p(g_, pos);
   p.advance(g_, radius_);
   return p.pos(g_);
 }
 
 void
-Simulation_impl_::random_window(double ratio)
+Simulation_impl_::random_window(double ratio) const
 {
-  wins = g_.random_window(ratio);
+  wins_ = g_.random_window(ratio);
 }
 
 void
@@ -68,11 +69,12 @@ Simulation_impl_::snapshot(double t)
     std::vector<Point_2> points;
 
     for (auto it = objects_.begin(); it != objects_.end(); ++it) {
-      auto pos = it->pos(g_());
+      auto pos = it->pos(g_);
       Point_2 p = linear_interpolate(
-          coord(pos.get<0>()), coord(pos.get<1>()), pos.get<2>());
+          g_.coord(pos.get<0>()), g_.coord(pos.get<1>()),
+          pos.get<2>());
 
-      infos.push_back(it->id(), pos);
+      infos.push_back(std::make_pair(it->id(), pos));
       points.push_back(p);
     }
 
@@ -98,11 +100,29 @@ Simulation_impl_::snapshot(double t)
 std::vector<int>
 Simulation_impl_::range_query()
 {
+  std::vector<int> results;
+  return results;
 }
 
 std::map<int, double>
 Simulation_impl_::range_query_pred()
 {
+  std::map<int, double> results;
+  return results;
 }
+
+std::vector<int>
+Simulation_impl_::nearest_neighbors(int id, int k)
+{
+  return g_.nearest_neighbors(id, k);
+}
+
+std::map<int, double>
+Simulation_impl_::nearest_neighbors_pred(int k)
+{
+  std::map<int, double> results;
+  return results;
+}
+
 
 }

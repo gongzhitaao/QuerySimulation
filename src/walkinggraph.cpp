@@ -13,6 +13,7 @@
 
 #include "walkinggraph.h"
 #include "param.h"
+#include "global.h"
 
 namespace simulation {
 
@@ -465,7 +466,7 @@ struct knn_visitor : public boost::default_bfs_visitor
 };
 
 std::vector<int>
-WalkingGraph::nearest_neighbor(int object, int k)
+WalkingGraph::nearest_neighbors(int object, int k)
 {
   std::vector<int> results;
   knn_visitor vis(results, k, names_);
