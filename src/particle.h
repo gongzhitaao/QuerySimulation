@@ -14,7 +14,7 @@ namespace simulation {
 class Particle
 {
  public:
-  Particle(const WalkingGraph &g, landmark_t pos = {0, 0, -1}, int id = -1);
+  Particle(const WalkingGraph &g, int id, landmark_t pos = {0, 0, -1});
   Particle(const Particle &other);
 
   landmark_t

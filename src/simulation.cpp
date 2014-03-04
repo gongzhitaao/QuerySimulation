@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <string>
@@ -13,6 +14,9 @@
 
 namespace simulation {
 
+using std::cout;
+using std::endl;
+
 // Query window intersects with rooms and hall, generating windows
 // with probability accordingly.
 static std::vector<std::pair<IsoRect_2, double> > wins_;
@@ -25,6 +29,13 @@ static double duration_;
 
 // Objects point set
 static Point_set_2 objectset_;
+
+void
+Simulation_impl_::initialize()
+{
+  for (int i = 0; i < num_object_; ++i)
+    objects_.push_back(Particle(g_, i));
+}
 
 // Generate readings for each objects
 void
@@ -46,7 +57,7 @@ landmark_t
 Simulation_impl_::random_inside_reader(int i) const
 {
   landmark_t pos = g_.reader_pos(i);
-  Particle p(g_, pos);
+  Particle p(g_, -1, pos);
   p.advance(g_, radius_);
   return p.pos(g_);
 }
@@ -64,10 +75,7 @@ Simulation_impl_::snapshot(double t)
 
   // construct objects point set for range query
   {
-    objectset_.clear();
-
     std::vector<Point_2> points;
-
     for (auto it = objects_.begin(); it != objects_.end(); ++it) {
       auto pos = it->pos(g_);
       Point_2 p = linear_interpolate(
@@ -88,13 +96,19 @@ Simulation_impl_::snapshot(double t)
   // insert object into graph for nearest neighbor query
   {
     std::vector<landmark_t> tmp(infos.size());
-    transform(infos.begin(), infos.end(), tmp.begin(),
-              [](const std::pair<int, landmark_t> &p) {
-                return p.second;
-              });
-    g_.clear_objects();
+    std::transform(infos.begin(), infos.end(), tmp.begin(),
+                   [](const std::pair<int, landmark_t> &p) {
+                     return p.second;
+                   });
     g_.insert_objects(tmp);
   }
+}
+
+void
+Simulation_impl_::reset()
+{
+  objectset_.clear();
+  g_.clear_objects();
 }
 
 std::vector<int>
@@ -124,5 +138,18 @@ Simulation_impl_::nearest_neighbors_pred(int k)
   return results;
 }
 
+void
+Simulation_impl_::run(double duration)
+{
+  for (auto it = objects_.begin(); it != objects_.end(); ++it)
+    it->advance(g_, duration);
+}
+
+int
+Simulation_impl_::random_object()
+{
+  boost::random::uniform_int_distribution<> unifi(0, num_object_);
+  return unifi(gen);
+}
 
 }

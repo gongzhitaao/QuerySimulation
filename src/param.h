@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <vector>
+
 extern const double SUCCESS_RATE;
 extern const int DURATION;
 extern const int NUM_OBJECT;

@@ -44,7 +44,7 @@ typedef boost::property<
       boost::vertex_color_t, vertex_color_enum> > > VertexProperty;
 
 typedef boost::property<
-  boost::edge_index_t, int,
+  boost::edge_name_t, int,
   boost::property<boost::edge_weight_t, double> > EdgeProperty;
 
 typedef boost::undirected_graph<
@@ -53,29 +53,31 @@ typedef boost::graph_traits<UndirectedGraph>::vertex_descriptor Vertex;
 typedef boost::graph_traits<UndirectedGraph>::edge_descriptor Edge;
 
 typedef boost::property_map<UndirectedGraph,
-                            boost::vertex_name_t>::type name_map_t;
+                            boost::vertex_name_t>::type vertex_name_t;
 typedef boost::property_map<UndirectedGraph,
                             vertex_coord_t>::type coord_map_t;
 typedef boost::property_map<UndirectedGraph,
                             boost::vertex_color_t>::type color_map_t;
 typedef boost::property_map<UndirectedGraph,
-                            boost::edge_index_t>::type index_map_t;
+                            boost::edge_name_t>::type edge_name_t;
 typedef boost::property_map<UndirectedGraph,
                             boost::edge_weight_t>::type weight_map_t;
 
 typedef boost::unordered_map<
   int, std::vector<std::pair<int, double> > > anchor_map_t;
 
-struct remove_anchor
+template<typename NameMap>
+struct positive_index
 {
-  remove_anchor() { }
-  remove_anchor(name_map_t names)
+  positive_index() { }
+  positive_index(NameMap names)
       : names_(names) { }
 
-  bool operator () (const Vertex &v) const
+  template <typename T>
+  bool operator () (const T &v) const
   { return names_[v] >= 0; }
 
-  name_map_t names_;
+  NameMap names_;
 };
 
 Point_2
@@ -89,21 +91,22 @@ class WalkingGraph
 
   const Point_2 &
   coord(int v) const
-  { return coords_[vertices_.at(v)]; }
+  { return boost::get(coords_, vertices_.at(v)); }
 
   double
   weight(int u, int v) const
-  { return weights_[boost::edge(vertices_.at(u),
-                                vertices_.at(v), g_).first]; }
+  { return boost::get(weights_,
+                      boost::edge(vertices_.at(u),
+                                  vertices_.at(v), g_).first); }
 
   vertex_color_enum
   color(int v) const
-  { return colors_[vertices_.at(v)]; }
+  { return boost::get(colors_, vertices_.at(v)); }
 
   template <typename Generator>
   int
   random_vertex(Generator gen) const
-  { return names_[boost::random_vertex(g_, gen)]; }
+  { return boost::get(vnames_, boost::random_vertex(fg_, gen)); }
 
   int
   random_next(int cur, int pre = -1) const;
@@ -147,16 +150,15 @@ class WalkingGraph
 
   UndirectedGraph g_;
 
-  name_map_t names_;
+  vertex_name_t vnames_;
   coord_map_t coords_;
   color_map_t colors_;
-  index_map_t indices_;
+  edge_name_t enames_;
   weight_map_t weights_;
 
-  boost::filtered_graph<UndirectedGraph, boost::keep_all,
-                        remove_anchor> fg_;
-  // boost::filtered_graph<
-  //   UndirectedGraph, boost::keep_all, boost::keep_all> fg_;
+  boost::filtered_graph<UndirectedGraph,
+                        positive_index<edge_name_t>,
+                        positive_index<vertex_name_t> > fg_;
 
   anchor_map_t anchors_;
   anchor_map_t objects_;

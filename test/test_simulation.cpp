@@ -17,26 +17,29 @@ simulation::WalkingGraph SimulationTest::g;
 
 TEST_F(SimulationTest, walkinggraph)
 {
-  ofstream fout("vertex.txt");
+  ofstream fout("edge.txt");
   g.print(fout);
   fout.close();
 }
 
 TEST_F(SimulationTest, particle)
 {
-  simulation::Particle p(g);
+  simulation::Particle p(g, -1);
   p.advance(g, 100);
   p.print(cout);
 }
 
-TEST_F(SimulationTest, nearest_neighbors)
+TEST_F(SimulationTest, random_pos)
 {
-  using namespace simulation;
-  simulation::Simulation sim(_num_object=10);
+  for (int i = 0; i < 100; ++i) {
+    simulation::landmark_t pos = g.random_pos();
+    cout << pos.get<0>() << ' ' << pos.get<1>() << endl;
+    cout << g.weight(pos.get<0>(), pos.get<1>()) << endl;
+  }
 }
 
 int main(int argc, char** argv) {
-  ::testing::GTEST_FLAG(filter) = "*particle";
+  ::testing::GTEST_FLAG(filter) = "*random_pos";
   // This allows the user to override the flag on the command line.
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

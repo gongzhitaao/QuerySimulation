@@ -3,6 +3,7 @@
 
 #include <boost/parameter/name.hpp>
 #include <boost/parameter/preprocessor.hpp>
+#include <boost/parameter/keyword.hpp>
 
 #include <boost/tuple/tuple.hpp>
 
@@ -13,6 +14,8 @@
 
 namespace simulation {
 
+namespace param {
+
 BOOST_PARAMETER_NAME(num_object)
 BOOST_PARAMETER_NAME(num_particle)
 BOOST_PARAMETER_NAME(radius)
@@ -21,6 +24,8 @@ BOOST_PARAMETER_NAME(knock_door_prob)
 BOOST_PARAMETER_NAME(enter_room_prob)
 BOOST_PARAMETER_NAME(threshold)
 BOOST_PARAMETER_NAME(success_rate)
+
+}
 
 class Simulation_impl_
 {
@@ -33,6 +38,9 @@ class Simulation_impl_
   snapshot(double t);
 
   void
+  reset();
+
+  void
   random_window(double ratio) const;
 
   std::vector<int>
@@ -41,7 +49,7 @@ class Simulation_impl_
   std::map<int, double>
   range_query_pred();
 
-  void
+  int
   random_object();
 
   std::vector<int>
@@ -56,15 +64,20 @@ class Simulation_impl_
 
   template <class ArgumentPack>
   Simulation_impl_(const ArgumentPack &args)
-      : num_object_(args[_num_object])
-      , num_particle_(args[_num_particle | 128])
-      , radius_(args[_radius | 120.0])
-      , unit_(args[_unit | 20])
-      , knock_door_prob_(args[_knock_door_prob | 0.1])
-      , enter_room_prob_(args[_enter_room_prob | 0.1])
-      , threshold_(args[_threshold | 0.4])
-      , success_rate_(args[_success_rate | 0.95])
-  { }
+      : num_object_(args[param::_num_object])
+      , num_particle_(args[param::_num_particle | 128])
+      , radius_(args[param::_radius | 120.0])
+      , unit_(args[param::_unit | 20])
+      , knock_door_prob_(args[param::_knock_door_prob | 0.1])
+      , enter_room_prob_(args[param::_enter_room_prob | 0.1])
+      , threshold_(args[param::_threshold | 0.4])
+      , success_rate_(args[param::_success_rate | 0.95])
+  {
+    initialize();
+  }
+
+  void
+  initialize();
 
   landmark_t
   random_inside_reader(int i) const;
@@ -94,7 +107,7 @@ class Simulation : public Simulation_impl_
 {
  public:
   BOOST_PARAMETER_CONSTRUCTOR(
-      Simulation, (Simulation_impl_), tag,
+      Simulation, (Simulation_impl_), param::tag,
       (required
        (num_object, *))
       (optional

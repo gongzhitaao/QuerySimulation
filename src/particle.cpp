@@ -11,15 +11,20 @@
 
 namespace simulation {
 
+using std::cout;
+using std::endl;
+
 double Particle::unit_ = 1.0;
 
-Particle::Particle(const WalkingGraph &g, landmark_t pos, int id)
+Particle::Particle(const WalkingGraph &g, int id, landmark_t pos)
     : id_(id)
 {
   boost::random::normal_distribution<> norm(80, 10);
   velocity_ = norm(gen);
 
   pos_ = pos.get<2>() < 0 ? g.random_pos() : pos;
+  // cout << "> " << pos_.get<0>() << ' ' << pos_.get<1>() << endl;
+
   history_.push_back(std::make_pair(
       -pos_.get<2>() * g.weight(pos_.get<0>(), pos_.get<1>()) / velocity_,
       pos_.get<0>()));
