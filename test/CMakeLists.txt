@@ -1,19 +1,21 @@
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
-add_executable(test_simsystem test_simsystem.cpp)
+add_executable(test_simulation test_simulation.cpp)
 
-target_link_libraries(test_simsystem param)
-target_link_libraries(test_simsystem particle)
-target_link_libraries(test_simsystem walkinggraph)
-target_link_libraries(test_simsystem utils)
+target_link_libraries(test_simulation simulation)
+target_link_libraries(test_simulation particle)
+target_link_libraries(test_simulation walkinggraph)
+target_link_libraries(test_simulation param)
+target_link_libraries(test_simulation global)
 
-target_link_libraries(test_simsystem gtest gtest_main)
-target_link_libraries(test_simsystem pthread)
+target_link_libraries(test_simulation gtest gtest_main)
+target_link_libraries(test_simulation pthread)
 
-target_link_libraries(test_simsystem CGAL CGAL_Core)
-target_link_libraries(test_simsystem gmp)
+target_link_libraries(test_simulation CGAL CGAL_Core)
+target_link_libraries(test_simulation gmp)
 
-target_link_libraries(test_simsystem boost_random)
-target_link_libraries(test_simsystem boost_system)
+target_link_libraries(test_simulation boost_random)
+target_link_libraries(test_simulation boost_system)
+target_link_libraries(test_simulation boost_thread)
 
-add_test(test-simsystem test_simsystem)
+add_test(test-simulation test_simulation)

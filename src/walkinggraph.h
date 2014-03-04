@@ -3,143 +3,179 @@
 
 #pragma once
 
-#include <map>
 #include <vector>
 
 #include <boost/graph/graph_traits.hpp>
-#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/undirected_graph.hpp>
+#include <boost/graph/filtered_graph.hpp>
+#include <boost/graph/random.hpp>
 
-#include <CGAL/Cartesian.h>
-#include <CGAL/Search_traits_2.h>
-#include <CGAL/Search_traits_adapter.h>
-#include <CGAL/Orthogonal_k_neighbor_search.h>
-#include <CGAL/property_map.h>
-#include <CGAL/Fuzzy_iso_box.h>
+#include <boost/tuple/tuple.hpp>
+#include <boost/unordered_map.hpp>
 
-namespace simsys {
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <CGAL/Delaunay_triangulation_2.h>
+#include <CGAL/Triangulation_vertex_base_with_info_2.h>
+#include <CGAL/Point_set_2.h>
 
-typedef CGAL::Cartesian<double> K;
+namespace simulation {
+
+typedef boost::tuple<int, int, double> landmark_t;
+
+typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef K::Point_2 Point_2;
-typedef CGAL::Iso_rectangle_2<K> IsoRect_2;
+typedef K::Iso_rectangle_2 IsoRect_2;
+typedef K::Circle_2 Circle_2;
+
+typedef CGAL::Triangulation_vertex_base_with_info_2<
+  std::pair<int, landmark_t>, K> Vb;
+typedef CGAL::Triangulation_data_structure_2<Vb> Tds;
+typedef CGAL::Point_set_2<K, Tds> Point_set_2;
+typedef Point_set_2::Vertex_handle  Vertex_handle;
 
 enum vertex_color_enum { HALL, DOOR, ROOM, VERTEX_COLOR_ENUM };
 
 struct vertex_coord_t { typedef boost::vertex_property_tag kind; };
-typedef boost::property<boost::vertex_index1_t, int> VertexLabelProperty;
-typedef boost::property<vertex_coord_t, Point_2, VertexLabelProperty> CoordProperty;
-typedef boost::property<boost::vertex_color_t, vertex_color_enum, CoordProperty> VertexProperty;
+typedef boost::property<
+  boost::vertex_name_t, int,
+  boost::property<
+    vertex_coord_t, Point_2,
+    boost::property<
+      boost::vertex_color_t, vertex_color_enum> > > VertexProperty;
 
-typedef boost::property<boost::edge_weight_t, double> EdgeProperty;
+typedef boost::property<
+  boost::edge_name_t, int,
+  boost::property<boost::edge_weight_t, double> > EdgeProperty;
 
-typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
-                              VertexProperty, EdgeProperty> UndirectedGraph;
+typedef boost::undirected_graph<
+  VertexProperty, EdgeProperty> UndirectedGraph;
 typedef boost::graph_traits<UndirectedGraph>::vertex_descriptor Vertex;
 typedef boost::graph_traits<UndirectedGraph>::edge_descriptor Edge;
 
-typedef boost::property_map<UndirectedGraph, boost::vertex_index1_t>::type VertexLabelMap;
-typedef boost::property_map<UndirectedGraph, boost::vertex_color_t>::type ColorMap;
-typedef boost::property_map<UndirectedGraph, vertex_coord_t>::type CoordMap;
-typedef boost::property_map<UndirectedGraph, boost::edge_weight_t>::type WeightMap;
+typedef boost::property_map<UndirectedGraph,
+                            boost::vertex_name_t>::type vertex_name_t;
+typedef boost::property_map<UndirectedGraph,
+                            vertex_coord_t>::type coord_map_t;
+typedef boost::property_map<UndirectedGraph,
+                            boost::vertex_color_t>::type color_map_t;
+typedef boost::property_map<UndirectedGraph,
+                            boost::edge_name_t>::type edge_name_t;
+typedef boost::property_map<UndirectedGraph,
+                            boost::edge_weight_t>::type weight_map_t;
 
-const Vertex NullVertex = boost::graph_traits<UndirectedGraph>::null_vertex();
+typedef boost::unordered_map<
+  int, std::vector<std::pair<int, double> > > anchor_map_t;
 
-typedef boost::tuple<Point_2, int> Point_and_int;
-typedef CGAL::Search_traits_2<K> Traits_base;
-typedef CGAL::Search_traits_adapter<
-  Point_and_int, CGAL::Nth_of_tuple_property_map<0, Point_and_int>, Traits_base> Traits;
+template<typename NameMap>
+struct positive_index
+{
+  positive_index() { }
+  positive_index(NameMap names)
+      : names_(names) { }
 
-typedef CGAL::Orthogonal_k_neighbor_search<Traits> K_neighbor_search;
-typedef K_neighbor_search::Tree Tree;
-typedef CGAL::Fuzzy_iso_box<Traits> Fuzzy_iso_box;
+  template <typename T>
+  bool operator () (const T &v) const
+  { return names_[v] >= 0; }
 
-struct Reader {
-  Point_2 center;
-  Vertex source, target;
-  double ratio;
+  NameMap names_;
 };
+
+Point_2
+linear_interpolate(const Point_2 &p0, const Point_2 &p1, double a);
 
 class WalkingGraph
 {
  public:
+
   WalkingGraph();
 
-  void
-  add_vertex(int id, double x, double y, vertex_color_enum c = HALL);
-
-  void
-  add_edge(int src, int des);
-
-  void
-  add_reader(double x, double y, int v1, int v2);
-
-  void
-  add_room(int id, double x0, double y0, double x1, double y1);
-
-  void
-  add_hall(double x0, double y0, double x1, double y1, int dir);
-
-  void
-  build_index(double unit);
-
-  int
-  detected(const Point_2 &p, double r, int id = -1);
-
-  int
-  align(const Point_2 &p);
-
-  std::vector<Point_and_int>
-  anchors(const Fuzzy_iso_box &win);
-
-  std::vector<Vertex>
-  path(Vertex source, Vertex target) const;
-
-  std::vector<std::pair<Fuzzy_iso_box, double> >
-  random_window(double ratio) const;
-
-  UndirectedGraph &
-  operator() () { return g_; }
-  const UndirectedGraph &
-  operator() () const { return g_; }
-
-  int
-  label(Vertex v) const
-  { return labels_[v]; }
-
   const Point_2 &
-  coord(Vertex v) const
-  { return coords_[v]; }
+  coord(int v) const
+  { return boost::get(coords_, vertices_.at(v)); }
 
   double
-  weight(Vertex u, Vertex v) const
-  { return weights_[boost::edge(u, v, g_).first]; }
-
-  const Reader &
-  reader(int i) const
-  { return readers_[i]; }
+  weight(int u, int v) const
+  { return boost::get(weights_,
+                      boost::edge(vertices_.at(u),
+                                  vertices_.at(v), g_).first); }
 
   vertex_color_enum
-  color(Vertex v) const
-  { return colors_[v]; }
+  color(int v) const
+  { return boost::get(colors_, vertices_.at(v)); }
 
- private:
+  template <typename Generator>
+  int
+  random_vertex(Generator gen) const
+  { return boost::get(vnames_, boost::random_vertex(fg_, gen)); }
+
+  int
+  random_next(int cur, int pre = -1) const;
+
+  landmark_t
+  random_pos() const;
+
+  landmark_t
+  reader_pos(int i) const { return readermap_.at(i); }
+
+  std::vector<std::pair<IsoRect_2, double> >
+  random_window(double ratio) const;
+
+  void
+  insert_objects(const std::vector<landmark_t> &objects);
+
+  void
+  clear_objects();
+
+  int
+  detected_by(const landmark_t &pos, double radius);
+
+  std::vector<int>
+  nearest_neighbors(int object, int k);
+
+  UndirectedGraph
+  operator () ()
+  { return g_; }
+
+  void
+  print(std::ostream &os) const;
+
+ protected:
+  enum { OBJECT_START=1000 };
+
+  void
+  initialize();
+
+  void
+  insert_anchors(double unit = 20.0);
+
   UndirectedGraph g_;
 
-  VertexLabelMap labels_;
-  ColorMap colors_;
-  CoordMap coords_;
-  WeightMap weights_;
+  vertex_name_t vnames_;
+  coord_map_t coords_;
+  color_map_t colors_;
+  edge_name_t enames_;
+  weight_map_t weights_;
 
-  std::map<int, Vertex> vertices_;
-  std::vector<Reader> readers_;
+  boost::filtered_graph<UndirectedGraph,
+                        positive_index<edge_name_t>,
+                        positive_index<vertex_name_t> > fg_;
+
+  anchor_map_t anchors_;
+  anchor_map_t objects_;
+
+  boost::unordered_map<int, Edge> edges_;
+  boost::unordered_map<int, Vertex> vertices_;
+
+  Point_set_2 readerset_;
+  boost::unordered_map<int, landmark_t> readermap_;
+
   std::vector<IsoRect_2> rooms_;
-  std::vector<std::pair<IsoRect_2, int> > halls_;
+  std::vector<IsoRect_2> halls_;
+  std::vector<int> dirs_;
 
   double xmax_, ymax_;
-
-  Tree readertree_;
-  Tree anchortree_;
 };
 
-}
+}  // namespace simsys
 
 #endif  // SRC_WALKINGGRAPH_H_
