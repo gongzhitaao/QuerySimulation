@@ -1,15 +1,9 @@
-#ifndef SRC_DEFS_H_
-#define SRC_DEFS_H_
+#ifndef SRC_PARAM_H_
+#define SRC_PARAM_H_
 
 #pragma once
 
 #include <vector>
-
-#include <boost/random.hpp>
-#include <boost/random/random_device.hpp>
-
-extern boost::random::random_device rd;
-extern boost::random::mt19937 gen;
 
 extern const double SUCCESS_RATE;
 extern const int DURATION;
@@ -25,4 +19,4 @@ extern const double THRESHOLD;
 
 extern const std::vector<double> WINDOW_RATIOS;
 
-#endif  // SRC_DEFS_H_
+#endif  // SRC_PARAM_H_
