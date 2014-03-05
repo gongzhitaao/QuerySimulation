@@ -370,7 +370,7 @@ WalkingGraph::detected_by(const landmark_t &pos, double radius)
       coord(pos.get<0>()), coord(pos.get<1>()), pos.get<2>());
   Circle_2 circle(center, radius);
 
-  std::vector<Vertex_handle> res;
+  std::vector<vertex_handle> res;
   readerset_.range_search(circle, std::back_inserter(res));
 
   if (res.empty()) return -1;
@@ -520,13 +520,81 @@ WalkingGraph::print(std::ostream &os) const
   }
 }
 
-// int
-// align(const Point_2 &p)
-// {
-//   K_neighbor_search search(anchortree_, p, 1);
-//   Point_2 center = boost::get<0>(search.begin()->first);
-//   return boost::get<1>(search.begin()->first);
-// }
+template <typename VertexName>
+struct nearest_anchor : public boost::default_bfs_visitor
+{
+  nearest_anchor(int &result, VertexName vnames)
+      : result_(result)
+      , vnames_(vnames){ }
+
+  template <typename Graph>
+  void
+  discover_vertex(const Vertex v, const Graph &g)
+  {
+    int name = boost::get(vnames_, v);
+    if (name < 0) {
+      result_ = boost::get(vnames_, v);
+      throw found_knn();
+    }
+  }
+
+  int &result_;
+  VertexName vnames_;
+};
+
+int
+WalkingGraph::align(const landmark_t &p)
+{
+  int result = 0;
+  nearest_anchor<vertex_name_t> vis(result, vnames_);
+
+  Edge e = boost::edge(vertices_.at(p.get<0>()),
+                       vertices_.at(p.get<1>()), g_).first;
+
+  std::vector<std::pair<int, double> > &vec = anchors_[enames_[e]];
+
+  auto pos = std::upper_bound(
+      vec.begin(), vec.end(), p.get<2>(),
+      [](double d, const std::pair<int, double> &p) {
+        return d < p.second;
+      });
+
+  if (vec.end() == pos)
+    std::advance(pos, -1);
+  else if (vec.begin() == pos)
+    std::advance(pos, 1);
+
+  int id = 2000;
+
+  pos = vec.insert(pos, std::make_pair(id, p.get<2>()));
+
+  Vertex curr = boost::add_vertex(id, g_);
+  auto p0 = std::prev(pos),
+       p1 = std::next(pos);
+  double w = boost::get(weights_, e);
+  Vertex prev = vertices_.at(p0->first),
+         next = vertices_.at(p1->first);
+
+  boost::add_edge(prev, curr,
+                  {id, {(p.get<2>() - p0->second) * w}}, g_);
+  boost::add_edge(curr, next,
+                  {id + 1, {(p1->second - p.get<2>()) * w}}, g_);
+
+  Edge e_old = boost::edge(prev, next, g_).first;
+  int id_old = boost::get(enames_, e_old);
+  double w_old = boost::get(weights_, e_old);
+  boost::remove_edge(prev, next, g_);
+
+  try {
+    boost::breadth_first_search(g_, curr, boost::visitor(vis));
+  } catch (found_knn fk) { }
+
+  boost::add_edge(prev, next, {id_old, {w_old}}, g_);
+  boost::remove_edge(prev, curr, g_);
+  boost::remove_edge(curr, next, g_);
+
+  return result;
+}
 
 // std::vector<Point_and_int>
 // WalkingGraph::anchors(const Fuzzy_iso_box &win)

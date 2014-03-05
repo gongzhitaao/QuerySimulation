@@ -31,7 +31,7 @@ typedef CGAL::Triangulation_vertex_base_with_info_2<
   std::pair<int, landmark_t>, K> Vb;
 typedef CGAL::Triangulation_data_structure_2<Vb> Tds;
 typedef CGAL::Point_set_2<K, Tds> Point_set_2;
-typedef Point_set_2::Vertex_handle  Vertex_handle;
+typedef Point_set_2::Vertex_handle  vertex_handle;
 
 enum vertex_color_enum { HALL, DOOR, ROOM, VERTEX_COLOR_ENUM };
 
@@ -131,6 +131,9 @@ class WalkingGraph
 
   std::vector<int>
   nearest_neighbors(int object, int k);
+
+  int
+  align(const landmark_t &p);
 
   UndirectedGraph
   operator () ()

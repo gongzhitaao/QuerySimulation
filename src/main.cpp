@@ -24,5 +24,7 @@ int main()
     cout << nn[i] << ' ';
   cout << endl;
 
+  sim.reset();
+
   return 0;
 }

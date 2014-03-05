@@ -83,7 +83,10 @@ class Simulation_impl_
   random_inside_reader(int i) const;
 
   void
-  detect();
+  detecting();
+
+  bool
+  predicting(int obj, double t, int limit = 2);
 
  private:
 
