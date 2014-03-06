@@ -12,16 +12,16 @@ int main()
 {
   using namespace simulation::param;
 
+  using namespace simulation::param;
   simulation::Simulation sim(_num_object=200);
 
   sim.run(200);
   sim.snapshot(100);
 
-  int object = sim.random_object();
-
-  std::vector<int> nn = sim.nearest_neighbors(object, 5);
-  for (size_t i = 0; i < nn.size(); ++i)
-    cout << nn[i] << ' ';
+  sim.random_window(0.02);
+  std::vector<int> results = sim.range_query();
+  for (size_t i = 0; i < results.size(); ++i)
+    cout << results[i] << ' ';
   cout << endl;
 
   sim.reset();

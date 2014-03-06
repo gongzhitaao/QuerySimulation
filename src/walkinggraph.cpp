@@ -259,9 +259,10 @@ int
 WalkingGraph::random_next(int to, int from) const
 {
   Vertex cur = vertices_.at(to);
-  Vertex pre = vertices_.at(from);
+  Vertex pre = from < 0 ? fg_.null_vertex() : vertices_.at(from);
 
   std::set<Vertex> hall, door, room;
+
   auto pairit = boost::out_edges(cur, fg_);
   for (auto it = pairit.first; it != pairit.second; ++it) {
     Vertex v = boost::target(*it, fg_);
@@ -273,31 +274,30 @@ WalkingGraph::random_next(int to, int from) const
     }
   }
 
-  if (fg_.null_vertex() == pre) {
+  if (hall.size() == 0 || fg_.null_vertex() == pre) {
     if (hall.size() > 0) {
       boost::random::uniform_int_distribution<>
           unifi(0, hall.size() - 1);
       return boost::get(vnames_,
-                        *(boost::next(hall.begin(), unifi(gen))));
+                        *boost::next(hall.begin(), unifi(gen)));
     }
-    return boost::get(vnames_, *(door.begin()));
+    return boost::get(vnames_, *door.begin());
   }
 
   boost::random::uniform_real_distribution<> unifd(0, 1);
 
   if (room.size() > 0 && boost::get(colors_, pre) != ROOM &&
       unifd(gen) < ENTER_ROOM)
-    return boost::get(vnames_, *(room.begin()));
+    return boost::get(vnames_, *room.begin());
 
-  if (door.size() > 0
-      && (boost::get(colors_, cur) == ROOM ||
-          unifd(gen) < KNOCK_DOOR))
-    return boost::get(vnames_, *(door.begin()));
+  if (door.size() > 0 && (boost::get(colors_, cur) == ROOM ||
+                          unifd(gen) < KNOCK_DOOR))
+    return boost::get(vnames_, *door.begin());
 
   if (hall.size() > 1) hall.erase(pre);
 
   boost::random::uniform_int_distribution<> unifi(0, hall.size() - 1);
-  return boost::get(vnames_, *(boost::next(hall.begin(), unifi(gen))));
+  return boost::get(vnames_, *boost::next(hall.begin(), unifi(gen)));
 }
 
 landmark_t
@@ -553,27 +553,41 @@ WalkingGraph::align(const landmark_t &p)
 
   std::vector<std::pair<int, double> > &vec = anchors_[enames_[e]];
 
-  auto pos = std::upper_bound(
+  if (vec.empty()) {
+    vec.push_back(std::make_pair(
+        boost::get(vnames_, boost::source(e, g_)), 0.0));
+    vec.push_back(std::make_pair(
+        boost::get(vnames_, boost::target(e, g_)), 1.0));
+  }
+
+  auto pos = std::lower_bound(
       vec.begin(), vec.end(), p.get<2>(),
-      [](double d, const std::pair<int, double> &p) {
-        return d < p.second;
+      [](const std::pair<int, double> &p, const double d) {
+        return p.second < d;
       });
 
-  if (vec.end() == pos)
-    std::advance(pos, -1);
-  else if (vec.begin() == pos)
+  assert(pos != vec.end());
+
+  if (vec.begin() == pos)
     std::advance(pos, 1);
 
-  int id = 2000;
+  assert(pos != vec.begin());
+
+  int id = 5000;
 
   pos = vec.insert(pos, std::make_pair(id, p.get<2>()));
 
   Vertex curr = boost::add_vertex(id, g_);
+
   auto p0 = std::prev(pos),
        p1 = std::next(pos);
+
   double w = boost::get(weights_, e);
-  Vertex prev = vertices_.at(p0->first),
-         next = vertices_.at(p1->first);
+
+  // cout << p0->first << ' ' << p1->first << endl;
+
+  Vertex prev = vertices_.at(p0->first);
+  Vertex next = vertices_.at(p1->first);
 
   boost::add_edge(prev, curr,
                   {id, {(p.get<2>() - p0->second) * w}}, g_);
@@ -592,68 +606,9 @@ WalkingGraph::align(const landmark_t &p)
   boost::add_edge(prev, next, {id_old, {w_old}}, g_);
   boost::remove_edge(prev, curr, g_);
   boost::remove_edge(curr, next, g_);
+  vec.erase(pos);
 
   return result;
 }
-
-// std::vector<Point_and_int>
-// WalkingGraph::anchors(const Fuzzy_iso_box &win)
-// {
-//   std::vector<Point_and_int> res;
-//   anchortree_.search(std::back_inserter(res), win);
-//   return res;
-// }
-
-// struct found_goal {};
-
-// template <typename Vertex>
-// class astar_goal_visitor : public boost::default_astar_visitor
-// {
-//  public:
-//   astar_goal_visitor(Vertex goal) : goal_(goal) {}
-
-//   template <typename Graph>
-//   void examine_vertex(Vertex &u, const Graph &g) {
-//     if (u == goal_) throw found_goal();
-//   }
-//  private:
-//   Vertex goal_;
-// };
-
-// template<typename Graph, typename CoordMap>
-// class heuristic : public boost::astar_heuristic<Graph, int>
-// {
-//  public:
-//   typedef typename boost::graph_traits<Graph>::vertex_descriptor Vertex;
-
-//   heuristic(Vertex &goal, const CoordMap &coord)
-//       :  goal_(goal), coord_(coord) {}
-
-//   int operator()(Vertex u) {
-//     return std::sqrt(CGAL::squared_distance(coord_[goal_], coord_[u]));
-//   }
-
-//  private:
-//   Vertex goal_;
-//   const CoordMap &coord_;
-// };
-
-// std::vector<Vertex>
-// WalkingGraph::path(Vertex source, Vertex target) const
-// {
-//   std::vector<Vertex> p(boost::num_vertices(g_));
-//   astar_goal_visitor<Vertex> visitor(source);
-//   try {
-//     boost::astar_search(
-//         g_, target, heuristic<UndirectedGraph, CoordMap>(target, coords_),
-//         boost::predecessor_map(boost::make_iterator_property_map(
-//             p.begin(), boost::get(boost::vertex_index, g_))).
-//         visitor(visitor));
-//   } catch (found_goal fg) {
-//     return p;
-//   }
-
-//   return std::vector<Vertex>();
-// }
 
 }

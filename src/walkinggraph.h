@@ -109,7 +109,7 @@ class WalkingGraph
   { return boost::get(vnames_, boost::random_vertex(fg_, gen)); }
 
   int
-  random_next(int cur, int pre = -1) const;
+  random_next(int to, int from = -1) const;
 
   landmark_t
   random_pos() const;

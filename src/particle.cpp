@@ -23,7 +23,6 @@ Particle::Particle(const WalkingGraph &g, int id, landmark_t pos)
   velocity_ = norm(gen);
 
   pos_ = pos.get<2>() < 0 ? g.random_pos() : pos;
-  // cout << "> " << pos_.get<0>() << ' ' << pos_.get<1>() << endl;
 
   history_.push_back(std::make_pair(
       -pos_.get<2>() * g.weight(pos_.get<0>(), pos_.get<1>()) / velocity_,

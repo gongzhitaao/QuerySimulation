@@ -62,8 +62,7 @@ Simulation_impl_::random_inside_reader(int i) const
 {
   landmark_t pos = g_.reader_pos(i);
   Particle p(g_, -1, pos);
-  p.advance(g_, radius_);
-  return p.pos(g_);
+  return p.advance(g_, radius_);
 }
 
 void
@@ -107,8 +106,10 @@ Simulation_impl_::snapshot(double t)
     g_.insert_objects(tmp);
   }
 
-  // generate readings for every object every second
   detecting();
+
+  for (int i = 0; i < num_object_; ++i)
+    predicting(i, t);
 }
 
 void
@@ -234,10 +235,13 @@ Simulation_impl_::predicting(int obj, double t, int limit)
   // unknown, which is exactly what we'd like to predict.
   double remain = t - end;
   double prob = 1.0 / num_particle_;
-  for (auto it = subparticles.begin(); it != subparticles.end(); ++it) {
+  for (auto it = subparticles.begin();
+       it != subparticles.end(); ++it) {
     landmark_t p = it->advance(g_, remain);
-    probs_[g_.align(it->pos(g_))][it->id()] += prob;
+    probs_[g_.align(p)][it->id()] += prob;
   }
+
+  return true;
 }
 
 }
