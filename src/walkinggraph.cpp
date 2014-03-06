@@ -213,6 +213,8 @@ WalkingGraph::insert_anchors(double unit)
                               boost::visitor(vis));
 
   int id = -1;
+  std::vector<std::pair<int, landmark_t> > infos;
+  std::vector<Point_2> points;
 
   for (auto it = anchors_.begin(); it != anchors_.end(); ++it) {
     const std::vector<std::pair<int, double> > &vec = it->second;
@@ -226,9 +228,15 @@ WalkingGraph::insert_anchors(double unit)
     int size = vec.size();
 
     for (int i = 1; i < size - 1; ++i) {
-      Point_2 p = linear_interpolate(boost::get(coords_, source),
-                                     boost::get(coords_, target),
-                                     vec[i].second);
+      int from = boost::get(vnames_, source),
+            to = boost::get(vnames_, target);
+      infos.push_back({vec[i].first, vec[i].second});
+
+      Point_2 p = linear_interpolate(coord(from),
+                                     coord(to), vec[i].second);
+
+      points.push_back(p);
+
       Vertex v = boost::add_vertex({vec[i].first, {p, {HALL}}}, g_);
 
       vertices_[vec[i].first] = v;
@@ -249,6 +257,11 @@ WalkingGraph::insert_anchors(double unit)
     edges_[id] = e;
   }
 
+  anchorset_.insert(
+      boost::make_zip_iterator(boost::make_tuple(points.begin(),
+                                                 infos.begin())),
+      boost::make_zip_iterator(boost::make_tuple(points.end(),
+                                                 infos.end())));
 }
 
 // Randomly choose next vertex to advance to.  If u which is where the
@@ -584,8 +597,6 @@ WalkingGraph::align(const landmark_t &p)
 
   double w = boost::get(weights_, e);
 
-  // cout << p0->first << ' ' << p1->first << endl;
-
   Vertex prev = vertices_.at(p0->first);
   Vertex next = vertices_.at(p1->first);
 
@@ -609,6 +620,21 @@ WalkingGraph::align(const landmark_t &p)
   vec.erase(pos);
 
   return result;
+}
+
+std::vector<int>
+WalkingGraph::anchors_in_win(const IsoRect_2 &w)
+{
+  std::vector<vertex_handle> tmp;
+  anchorset_.range_search(w.vertex(0), w.vertex(1),
+                          w.vertex(2), w.vertex(3),
+                          std::back_inserter(tmp));
+  std::vector<int> results;
+  std::transform(tmp.begin(), tmp.end(), std::back_inserter(results),
+                 [] (const vertex_handle vh) {
+                   return vh->info().first;
+                 });
+  return results;
 }
 
 }

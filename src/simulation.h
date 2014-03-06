@@ -6,6 +6,7 @@
 #include <boost/parameter/keyword.hpp>
 
 #include <boost/tuple/tuple.hpp>
+#include <boost/unordered_map.hpp>
 
 #include <CGAL/Point_set_2.h>
 
@@ -46,7 +47,7 @@ class Simulation_impl_
   std::vector<int>
   range_query();
 
-  std::map<int, double>
+  boost::unordered_map<int, double>
   range_query_pred();
 
   int
@@ -55,7 +56,7 @@ class Simulation_impl_
   std::vector<int>
   nearest_neighbors(int id, int k);
 
-  std::map<int, double>
+  boost::unordered_map<int, double>
   nearest_neighbors_pred(int k);
 
  protected:

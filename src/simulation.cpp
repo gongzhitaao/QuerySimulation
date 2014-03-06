@@ -139,10 +139,18 @@ Simulation_impl_::range_query()
   return results;
 }
 
-std::map<int, double>
+boost::unordered_map<int, double>
 Simulation_impl_::range_query_pred()
 {
-  std::map<int, double> results;
+  boost::unordered_map<int, double> results;
+  for (auto w = wins_.begin(); w != wins_.end(); ++w) {
+    std::vector<int> anchors = g_.anchors_in_win(w->first);
+    for (auto ac = anchors.begin(); ac != anchors.end(); ++ac) {
+      boost::unordered_map<int, double> &prob = probs_[*ac];
+      for (auto it = prob.begin(); it != prob.end(); ++it)
+        results[it->first] += it->second * w->second;
+    }
+  }
   return results;
 }
 
@@ -152,10 +160,10 @@ Simulation_impl_::nearest_neighbors(int id, int k)
   return g_.nearest_neighbors(id, k);
 }
 
-std::map<int, double>
+boost::unordered_map<int, double>
 Simulation_impl_::nearest_neighbors_pred(int k)
 {
-  std::map<int, double> results;
+  boost::unordered_map<int, double> results;
   return results;
 }
 

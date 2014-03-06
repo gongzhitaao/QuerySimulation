@@ -135,6 +135,9 @@ class WalkingGraph
   int
   align(const landmark_t &p);
 
+  std::vector<int>
+  anchors_in_win(const IsoRect_2 &w);
+
   UndirectedGraph
   operator () ()
   { return g_; }
@@ -165,6 +168,8 @@ class WalkingGraph
 
   anchor_map_t anchors_;
   anchor_map_t objects_;
+
+  Point_set_2 anchorset_;
 
   boost::unordered_map<int, Edge> edges_;
   boost::unordered_map<int, Vertex> vertices_;
