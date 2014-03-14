@@ -27,16 +27,8 @@ linear_interpolate(const Point_2 &p0, const Point_2 &p1, double a)
 }
 
 WalkingGraph::WalkingGraph()
-    : vnames_(boost::get(boost::vertex_name, g_))
-    , coords_(boost::get(vertex_coord_t(), g_))
-    , colors_(boost::get(boost::vertex_color, g_))
-    , enames_(boost::get(boost::edge_name, g_))
-    , weights_(boost::get(boost::edge_weight, g_))
-    , fg_(make_filtered_graph(g_,
-        positive_index<edge_name_t>(
-            boost::get(boost::edge_name, g_)),
-        positive_index<vertex_name_t>(
-            boost::get(boost::vertex_name, g_))))
+    : vnames_(boost::get(boost::vertex_name, wg_))
+    , enames_(boost::get(boost::edge_name, wg_))
 {
   initialize();
   insert_anchors();
@@ -46,7 +38,8 @@ void
 WalkingGraph::initialize()
 {
   const std::string Commenter("//");
-  const std::string DataRoot("/home/gongzhitaao/Documents/simsystem/data/jiao/");
+  const std::string DataRoot("/home/gongzhitaao/Documents/"
+                             "simulator/data/jiao/");
 
   // Read in vertices for walking graph.
   {
@@ -60,8 +53,9 @@ WalkingGraph::initialize()
       int name, type;
       double x, y;
       ss >> name >> x >> y >> type;
-      vertices_[name] = boost::add_vertex(
-          {name, {Point_2(x, y), {(vertex_color_enum) type}}}, g_);
+      vertices_[name] = boost::add_vertex(name, wg_);
+      vertices_[name] = boost::add_vertex(name, ag_);
+      vp_[name] = {Point_2(x, y), (vertex_color_enum) type};
     }
     fin.close();
   }
@@ -70,26 +64,24 @@ WalkingGraph::initialize()
   {
     std::ifstream fin(DataRoot + "edge.txt");
     std::string line;
-    int id = 0;
-    while (std::getline(fin, line)) {
+    for (int id = 0; std::getline(fin, line); ++id) {
       boost::algorithm::trim_left(line);
       if (line.compare(0, Commenter.size(), Commenter) == 0) continue;
 
       std::stringstream ss(line);
       int n1, n2;
       ss >> n1 >> n2;
-      edges_[id] = boost::add_edge(
-          vertices_.at(n1), vertices_.at(n2),
-          {id++, {std::sqrt(CGAL::squared_distance(coord(n1),
-                                                   coord(n2)))}},
-          g_).first;
+      boost::add_edge(vertices_.at(n1), vertices_.at(n2), id, wg_);
+      boost::add_edge(vertices_.at(n1), vertices_.at(n2), id, ag_);
+      ep_[id].weight = std::sqrt(
+          CGAL::squared_distance(coord(n1), coord(n2)));
     }
     fin.close();
   }
 
   // Read in RFID readers.
   {
-    std::vector<std::pair<int, landmark_t> > infos;
+    std::vector<int> infos;
     std::vector<Point_2> points;
 
     std::ifstream fin(DataRoot + "rfid2.txt");
@@ -106,7 +98,7 @@ WalkingGraph::initialize()
       Point_2 p0(x, y), p1 = coord(v1), p2 = coord(v2);
       double p = std::sqrt(CGAL::squared_distance(p0, p1) /
                            CGAL::squared_distance(p1, p2));
-      infos.push_back({id, {v1, v2, p}});
+      infos.push_back(id);
       points.push_back(Point_2(x, y));
       readermap_[id] = {v1, v2, p};
     }
@@ -160,16 +152,11 @@ WalkingGraph::initialize()
 class InsertAnchor : public boost::default_bfs_visitor
 {
  public:
-  InsertAnchor(UndirectedGraph &g, anchor_map_t &anchors, double unit)
-      : vnames_(boost::get(boost::vertex_name, g))
-      , enames_(boost::get(boost::edge_name, g))
-      , weights_(boost::get(boost::edge_weight, g))
-      , anchors_(anchors)
-      , unit_(unit)
-      , name_(-1) { }
+  InsertAnchor(WalkingGraph &g, double unit = 20.0)
+      : g_(g), name_(g_.ANCHORID), unit_(unit) { }
 
   void
-  initialize_vertex(Vertex v, const UndirectedGraph &g)
+  initialize_vertex(Vertex v, const UndirectedGraph &)
   { dist_[v] = 0.0; }
 
   void
@@ -177,46 +164,47 @@ class InsertAnchor : public boost::default_bfs_visitor
   {
     Vertex source = boost::source(e, g),
            target = boost::target(e, g);
+    int id = boost::get(g_.enames_, e);
 
     double d = dist_[source],
-           w = boost::get(weights_, e);
+           w = g_.ep_.at(id).weight;
 
-    int id = boost::get(enames_, e);
-    anchors_[id].push_back(
-        std::make_pair(boost::get(vnames_, source), 0.0));
+    g_.ep_.at(id).anchors.push_back(
+        std::make_pair(boost::get(g_.vnames_, source), 0.0));
     while (d < w) {
-      anchors_[id].push_back(std::make_pair(name_--, d / w));
+      g_.ep_.at(id).anchors.push_back(std::make_pair(name_++, d / w));
       d += unit_;
     }
-    anchors_[id].push_back(
-        std::make_pair(boost::get(vnames_, target), 1.0));
+    g_.ep_.at(id).anchors.push_back(
+        std::make_pair(boost::get(g_.vnames_, target), 1.0));
     dist_[target] = d - w;
   }
 
  private:
   boost::unordered_map<Vertex, double> dist_;
-  vertex_name_t vnames_;
-  edge_name_t enames_;
-  weight_map_t weights_;
-  anchor_map_t &anchors_;
-  double unit_;
+  WalkingGraph &g_;
   int name_;
+  double unit_;
 };
 
 void
 WalkingGraph::insert_anchors(double unit)
 {
   // calculate the anchor points in a bfs fashion
-  InsertAnchor vis(g_, anchors_, 20);
-  boost::breadth_first_search(g_, boost::random_vertex(g_, gen),
+  InsertAnchor vis(*this, 20);
+  boost::breadth_first_search(wg_, boost::random_vertex(wg_, gen),
                               boost::visitor(vis));
 
-  int id = -1;
-  std::vector<std::pair<int, landmark_t> > infos;
+  int id = boost::num_edges(ag_);
+
+  std::vector<int> infos;
   std::vector<Point_2> points;
 
-  for (auto it = anchors_.begin(); it != anchors_.end(); ++it) {
-    const std::vector<std::pair<int, double> > &vec = it->second;
+  for (auto it = boost::edges(wg_); it.first != it.second;
+       ++it.first, ++id) {
+
+    const std::vector<std::pair<int, double> > &vec =
+        ep_.at(boost::get(enames_, *it.first)).anchors;
     if (vec.size() <= 2) continue;
 
     Vertex source = vertices_[vec[0].first],
@@ -226,34 +214,40 @@ WalkingGraph::insert_anchors(double unit)
     double w = weight(vec[0].first, vec.back().first);
     int size = vec.size();
 
+    boost::remove_edge(source, target, ag_);
+
     for (int i = 1; i < size - 1; ++i) {
       int from = boost::get(vnames_, source),
             to = boost::get(vnames_, target);
-      infos.push_back({vec[i].first, vec[i].second});
-
       Point_2 p = linear_interpolate(coord(from),
                                      coord(to), vec[i].second);
 
-      points.push_back(p);
-
-      Vertex v = boost::add_vertex({vec[i].first, {p, {HALL}}}, g_);
-
+      Vertex v = boost::add_vertex(vec[i].first, ag_);
+      vertex_color_enum c = HALL;
+      if (color(from) == ROOM || color(to) == ROOM) c = ROOM;
       vertices_[vec[i].first] = v;
 
-      Edge e = boost::add_edge(
-          u, v, {id, {w * (vec[i].second - vec[i-1].second)}},
-          g_).first;
+      vp_[vec[i].first] = {p, c};
+      ap_[vec[i].first] = {from, to, vec[i].second};
 
-      edges_[id] = e;
+      points.push_back(p);
+      infos.push_back(vec[i].first);
 
-      --id;
+      boost::add_edge(u, v, id, ag_);
+      ep_[id].weight = w * (vec[i].second - vec[i-1].second);
+
       u = v;
     }
 
-    Edge e = boost::add_edge(u, vertices_[vec.back().first],
-                             {id, {w - w * vec[size-2].second}},
-                             g_).first;
-    edges_[id] = e;
+    boost::add_edge(u, vertices_[vec.back().first], id, ag_);
+    ep_[id].weight = w * (1 - vec[size-2].second);
+  }
+
+  for (auto it = boost::vertices(wg_); it.first != it.second;
+       ++it.first) {
+    int name = boost::get(vnames_, *it.first);
+    infos.push_back(name);
+    points.push_back(coord(name));
   }
 
   anchorset_.insert(
@@ -271,14 +265,14 @@ int
 WalkingGraph::random_next(int to, int from) const
 {
   Vertex cur = vertices_.at(to);
-  Vertex pre = from < 0 ? fg_.null_vertex() : vertices_.at(from);
+  Vertex pre = from < 0 ? wg_.null_vertex() : vertices_.at(from);
 
-  std::set<Vertex> hall, door, room;
+  boost::unordered_set<Vertex> hall, door, room;
 
-  auto pairit = boost::out_edges(cur, fg_);
-  for (auto it = pairit.first; it != pairit.second; ++it) {
-    Vertex v = boost::target(*it, fg_);
-    switch (boost::get(colors_, v)) {
+  auto pit = boost::out_edges(cur, wg_);
+  for (auto it = pit.first; it != pit.second; ++it) {
+    Vertex v = boost::target(*it, wg_);
+    switch (color(boost::get(vnames_, v))) {
       case HALL: hall.insert(v); break;
       case DOOR: door.insert(v); break;
       case ROOM: room.insert(v); break;
@@ -286,7 +280,7 @@ WalkingGraph::random_next(int to, int from) const
     }
   }
 
-  if (hall.size() == 0 || fg_.null_vertex() == pre) {
+  if (hall.size() == 0 || wg_.null_vertex() == pre) {
     if (hall.size() > 0) {
       boost::random::uniform_int_distribution<>
           unifi(0, hall.size() - 1);
@@ -298,11 +292,11 @@ WalkingGraph::random_next(int to, int from) const
 
   boost::random::uniform_real_distribution<> unifd(0, 1);
 
-  if (room.size() > 0 && boost::get(colors_, pre) != ROOM &&
+  if (room.size() > 0 && color(boost::get(vnames_, pre)) != ROOM &&
       unifd(gen) < enter_room_)
     return boost::get(vnames_, *room.begin());
 
-  if (door.size() > 0 && (boost::get(colors_, cur) == ROOM ||
+  if (door.size() > 0 && (color(boost::get(vnames_, cur)) == ROOM ||
                           unifd(gen) < knock_door_))
     return boost::get(vnames_, *door.begin());
 
@@ -315,14 +309,10 @@ WalkingGraph::random_next(int to, int from) const
 landmark_t
 WalkingGraph::random_pos() const
 {
-  Edge e = boost::random_edge(fg_, gen);
-  while (!boost::edge(boost::source(e, fg_),
-                   boost::target(e, fg_), fg_).second)
-    e = boost::random_edge(fg_, gen);
-
+  Edge e = boost::random_edge(wg_, gen);
   boost::random::uniform_real_distribution<> unifd(0, 1);
-  return boost::make_tuple(vnames_[boost::source(e, g_)],
-                           vnames_[boost::target(e, g_)],
+  return boost::make_tuple(vnames_[boost::source(e, wg_)],
+                           vnames_[boost::target(e, wg_)],
                            unifd(gen));
 }
 
@@ -387,293 +377,29 @@ WalkingGraph::detected_by(const landmark_t &pos, double radius)
 
   if (res.empty()) return -1;
 
-  return (*res.begin())->info().first;
+  return (*res.begin())->info();
 }
-
-static int count_;
-static std::vector<int> edge_with_objects_;
-
-void
-WalkingGraph::insert_objects(const std::vector<landmark_t> &objects)
-{
-  {
-    int id = OBJECT_START;
-    count_ = objects.size();
-    for (size_t i = 0; i < objects.size(); ++i) {
-      landmark_t pos = objects[i];
-      Edge e = boost::edge(vertices_[pos.get<0>()],
-                           vertices_[pos.get<1>()], fg_).first;
-
-      int u = boost::get(vnames_, boost::source(e, g_));
-      if (u == pos.get<1>()) {
-        int t = pos.get<0>();
-        pos.get<0>() = pos.get<1>();
-        pos.get<1>() = t;
-        pos.get<2>() = 1 - pos.get<2>();
-      }
-
-      int ind = boost::get(enames_, e);
-
-      if (objects_[ind].empty())
-        edge_with_objects_.push_back(ind);
-
-      objects_[ind].push_back(std::make_pair(id + i, pos.get<2>()));
-    }
-  }
-
-  {
-    int id = boost::num_edges(g_);
-    for (auto it = edge_with_objects_.begin();
-         it != edge_with_objects_.end(); ++it) {
-      std::vector<std::pair<int, double> > &vec = objects_[*it];
-      Edge e = edges_[*it];
-      Vertex source = boost::source(e, g_);
-      Vertex target = boost::target(e, g_);
-      double w = boost::get(weights_, e);
-
-      sort(vec.begin(), vec.end(),
-           [](const std::pair<int, double> &a,
-              const std::pair<int, double> &b) {
-             return a.second < b.second;
-           });
-
-      Vertex u = source;
-      double pre = 0.0;
-      for (auto vit = vec.begin(); vit != vec.end(); ++vit) {
-        Point_2 p = linear_interpolate(
-            boost::get(coords_, source), boost::get(coords_, target),
-            vit->second);
-        Vertex v = boost::add_vertex({vit->first, {p, {HALL}}}, g_);
-
-        vertices_[vit->first] = v;
-
-        edges_[id] = boost::add_edge(
-            u, v, {id, {w * vit->second - pre}}, g_).first;
-        ++id;
-        u = v;
-        pre = w * vit->second;
-      }
-    }
-  }
-}
-
-void
-WalkingGraph::clear_objects()
-{
-  for (int i = OBJECT_START; i < count_; ++i) {
-    auto pair = boost::out_edges(vertices_[i], g_);
-    for (auto it = pair.first; it != pair.second; ++it)
-      boost::remove_edge(*it, g_);
-    boost::remove_vertex(vertices_[i], g_);
-  }
-
-  for (auto it = edge_with_objects_.begin();
-       it != edge_with_objects_.end(); ++it) {
-    objects_[*it].clear();
-  }
-  edge_with_objects_.clear();
-}
-
-struct found_knn {};
-
-template <typename VertexName>
-struct knn_visitor : public boost::default_bfs_visitor
-{
-  // knn_visitor() { }
-  knn_visitor(boost::unordered_set<int> &results,
-              int k, VertexName vnames)
-      : results_(results)
-      , count_(k)
-      , vnames_(vnames){ }
-
-  template <typename Graph>
-  void
-  discover_vertex(const Vertex v, const Graph &g)
-  {
-    int name = boost::get(vnames_, v);
-    if (name >= 1000) {
-      --count_;
-
-      results_.insert(name - 1000);
-
-      if (0 == count_)
-        throw found_knn();
-    }
-  }
-
-  boost::unordered_set<int> &results_;
-  int count_;
-  VertexName vnames_;
-};
-
-template <typename VertexName>
-struct knn_prob_visitor : public boost::default_bfs_visitor
-{
-  knn_prob_visitor(boost::unordered_map<int, double> &results,
-                   int k, boost::unordered_map<int,
-                   boost::unordered_map<int, double> > probs,
-                   VertexName vnames)
-      : results_(results)
-      , count_(k)
-      , probs_(probs)
-      , vnames_(vnames) { }
-
-  template <typename Graph>
-  void
-  discover_vertex(const Vertex v, const Graph &g)
-  {
-    int name = boost::get(vnames_, v);
-    if (name < 0) {
-      // This is an anchor point
-      boost::unordered_map<int, double> &map = probs_[name];
-      for (auto i = map.begin(); i != map.end(); ++i) {
-        results_[i->first] += i->second;
-        count_ -= i->second;
-      }
-      if (count_ <= 0.0)
-        throw found_knn();
-    }
-  }
-
-  boost::unordered_map<int, double> &results_;
-  double count_;
-  boost::unordered_map<int, boost::unordered_map<int, double> > probs_;
-  VertexName vnames_;
-};
-
-boost::unordered_set<int>
-WalkingGraph::nearest_neighbors(int object, int k)
-{
-  boost::unordered_set<int> results;
-  knn_visitor<vertex_name_t> vis(results, k, vnames_);
-
-  try {
-    boost::breadth_first_search(fg_, vertices_[OBJECT_START + object],
-                                boost::visitor(vis));
-  } catch (found_knn fk) { }
-
-  return results;
-}
-
-boost::unordered_map<int, double>
-WalkingGraph::nearest_neighbors(int object, int k,
-                                boost::unordered_map<int,
-                                boost::unordered_map<int, double> >probs)
-{
-  boost::unordered_map<int, double> results;
-  knn_prob_visitor<vertex_name_t> vis(results, k, probs, vnames_);
-
-  try {
-    boost::breadth_first_search(g_, vertices_[OBJECT_START + object],
-                                boost::visitor(vis));
-  } catch (found_knn fk) { }
-
-  return results;
-}
-
 
 void
 WalkingGraph::print(std::ostream &os) const
 {
   // boost::graph_traits<UndirectedGraph>::vertex_iterator vi, end;
-  // for (boost::tie(vi, end) = boost::vertices(g_); vi != end; ++vi)
+  // for (boost::tie(vi, end) = boost::vertices(wg_); vi != end; ++vi)
   //   os << boost::get(coords_, *vi) << std::endl;
   boost::graph_traits<UndirectedGraph>::edge_iterator ei, eend;
-  for (boost::tie(ei, eend) = boost::edges(g_); ei != eend; ++ei) {
-    Vertex v = boost::source(*ei, g_);
-    Vertex u = boost::target(*ei, g_);
-    os << boost::get(coords_, v) << ' '
-       << boost::get(coords_, u) << endl;
+  for (boost::tie(ei, eend) = boost::edges(wg_); ei != eend; ++ei) {
+    Vertex v = boost::source(*ei, wg_);
+    Vertex u = boost::target(*ei, wg_);
+    os << coord(boost::get(vnames_, v)) << ' '
+       << coord(boost::get(vnames_, u)) << endl;
   }
 }
-
-template <typename VertexName>
-struct nearest_anchor : public boost::default_bfs_visitor
-{
-  nearest_anchor(int &result, VertexName vnames)
-      : result_(result)
-      , vnames_(vnames){ }
-
-  template <typename Graph>
-  void
-  discover_vertex(const Vertex v, const Graph &g)
-  {
-    int name = boost::get(vnames_, v);
-    if (name < 0) {
-      result_ = boost::get(vnames_, v);
-      throw found_knn();
-    }
-  }
-
-  int &result_;
-  VertexName vnames_;
-};
 
 int
 WalkingGraph::align(const landmark_t &p)
 {
-  int result = 0;
-  nearest_anchor<vertex_name_t> vis(result, vnames_);
-
-  Edge e = boost::edge(vertices_.at(p.get<0>()),
-                       vertices_.at(p.get<1>()), g_).first;
-
-  std::vector<std::pair<int, double> > &vec = anchors_[enames_[e]];
-
-  if (vec.empty()) {
-    vec.push_back(std::make_pair(
-        boost::get(vnames_, boost::source(e, g_)), 0.0));
-    vec.push_back(std::make_pair(
-        boost::get(vnames_, boost::target(e, g_)), 1.0));
-  }
-
-  auto pos = std::lower_bound(
-      vec.begin(), vec.end(), p.get<2>(),
-      [](const std::pair<int, double> &p, const double d) {
-        return p.second < d;
-      });
-
-  assert(pos != vec.end());
-
-  if (vec.begin() == pos)
-    std::advance(pos, 1);
-
-  assert(pos != vec.begin());
-
-  int id = 5000;
-
-  pos = vec.insert(pos, std::make_pair(id, p.get<2>()));
-
-  Vertex curr = boost::add_vertex(id, g_);
-
-  auto p0 = std::prev(pos),
-       p1 = std::next(pos);
-
-  double w = boost::get(weights_, e);
-
-  Vertex prev = vertices_.at(p0->first);
-  Vertex next = vertices_.at(p1->first);
-
-  boost::add_edge(prev, curr,
-                  {id, {(p.get<2>() - p0->second) * w}}, g_);
-  boost::add_edge(curr, next,
-                  {id + 1, {(p1->second - p.get<2>()) * w}}, g_);
-
-  Edge e_old = boost::edge(prev, next, g_).first;
-  int id_old = boost::get(enames_, e_old);
-  double w_old = boost::get(weights_, e_old);
-  boost::remove_edge(prev, next, g_);
-
-  try {
-    boost::breadth_first_search(g_, curr, boost::visitor(vis));
-  } catch (found_knn fk) { }
-
-  boost::add_edge(prev, next, {id_old, {w_old}}, g_);
-  boost::remove_edge(prev, curr, g_);
-  boost::remove_edge(curr, next, g_);
-  vec.erase(pos);
-
-  return result;
+  Point_2 pt = coord(p);
+  return anchorset_.nearest_neighbor(pt)->info();
 }
 
 std::vector<int>
@@ -686,7 +412,7 @@ WalkingGraph::anchors_in_win(const IsoRect_2 &w)
   std::vector<int> results;
   std::transform(tmp.begin(), tmp.end(), std::back_inserter(results),
                  [] (const vertex_handle vh) {
-                   return vh->info().first;
+                   return vh->info();
                  });
   return results;
 }

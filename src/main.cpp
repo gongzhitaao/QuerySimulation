@@ -12,7 +12,7 @@
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
 
-#include "simulation.h"
+#include "simulator.h"
 #include "global.h"
 
 using std::cout;
@@ -67,37 +67,43 @@ int main()
   const double RATIO = 0.02;
   const double K = 5;
 
-  typedef boost::accumulators::accumulator_set<
-    double, boost::accumulators::features<
-              boost::accumulators::tag::mean,
-              boost::accumulators::tag::variance> > accumulators;
-
   using namespace simulation::param;
-  simulation::Simulation sim(_num_object=200);
+
+  simulation::Simulator sim(_num_object=200);
 
   sim.run(DURATION);
-  sim.detecting();
 
-  accumulators acc;
-  boost::random::uniform_real_distribution<> unifd(100.0, 200.0);
-  for (int ts = 0; ts < NUM_TIMESTAMP; ++ts) {
+  // typedef boost::accumulators::accumulator_set<
+  //   double, boost::accumulators::features<
+  //             boost::accumulators::tag::mean,
+  //             boost::accumulators::tag::variance> > accumulators;
 
-    sim.snapshot(unifd(gen));
+  // using namespace simulation::param;
+  // simulation::Simulation sim(_num_object=200);
 
-    sim.random_window(0.02);
+  // sim.run(DURATION);
+  // sim.detecting();
 
-    boost::unordered_set<int> real = sim.range_query();
-    boost::unordered_map<int, double> fake = sim.range_query_pred();
+  // accumulators acc;
+  // boost::random::uniform_real_distribution<> unifd(100.0, 200.0);
+  // for (int ts = 0; ts < NUM_TIMESTAMP; ++ts) {
 
-    acc(recall(real, fake));
+  //   sim.snapshot(unifd(gen));
 
-    sim.reset();
+  //   sim.random_window(0.02);
 
-    cout << "finishing..." << ts << endl;
-    cout << boost::accumulators::mean(acc) << ' '
-         << boost::accumulators::variance(acc) << endl;
+  //   boost::unordered_set<int> real = sim.range_query();
+  //   boost::unordered_map<int, double> fake = sim.range_query_pred();
 
-  }
+  //   acc(recall(real, fake));
+
+  //   sim.reset();
+
+  //   cout << "finishing..." << ts << endl;
+  //   cout << boost::accumulators::mean(acc) << ' '
+  //        << boost::accumulators::variance(acc) << endl;
+
+  // }
 
 
   return 0;

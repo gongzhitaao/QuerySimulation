@@ -21,6 +21,7 @@
 
 namespace simulation {
 
+// <source, target, perscentage>
 typedef boost::tuple<int, int, double> landmark_t;
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
@@ -28,25 +29,25 @@ typedef K::Point_2 Point_2;
 typedef K::Iso_rectangle_2 IsoRect_2;
 typedef K::Circle_2 Circle_2;
 
-typedef CGAL::Triangulation_vertex_base_with_info_2<
-  std::pair<int, landmark_t>, K> Vb;
+typedef CGAL::Triangulation_vertex_base_with_info_2<int, K> Vb;
 typedef CGAL::Triangulation_data_structure_2<Vb> Tds;
 typedef CGAL::Point_set_2<K, Tds> Point_set_2;
-typedef Point_set_2::Vertex_handle  vertex_handle;
+typedef Point_set_2::Vertex_handle vertex_handle;
 
 enum vertex_color_enum { HALL, DOOR, ROOM, VERTEX_COLOR_ENUM };
 
-struct vertex_coord_t { typedef boost::vertex_property_tag kind; };
-typedef boost::property<
-  boost::vertex_name_t, int,
-  boost::property<
-    vertex_coord_t, Point_2,
-    boost::property<
-      boost::vertex_color_t, vertex_color_enum> > > VertexProperty;
+struct VP {
+  Point_2 coord;
+  vertex_color_enum color;
+};
 
-typedef boost::property<
-  boost::edge_name_t, int,
-  boost::property<boost::edge_weight_t, double> > EdgeProperty;
+struct EP {
+  double weight;
+  std::vector<std::pair<int, double> > anchors;
+};
+
+typedef boost::property<boost::vertex_name_t, int> VertexProperty;
+typedef boost::property<boost::edge_name_t, int> EdgeProperty;
 
 typedef boost::undirected_graph<
   VertexProperty, EdgeProperty> UndirectedGraph;
@@ -56,36 +57,18 @@ typedef boost::graph_traits<UndirectedGraph>::edge_descriptor Edge;
 typedef boost::property_map<UndirectedGraph,
                             boost::vertex_name_t>::type vertex_name_t;
 typedef boost::property_map<UndirectedGraph,
-                            vertex_coord_t>::type coord_map_t;
-typedef boost::property_map<UndirectedGraph,
-                            boost::vertex_color_t>::type color_map_t;
-typedef boost::property_map<UndirectedGraph,
                             boost::edge_name_t>::type edge_name_t;
-typedef boost::property_map<UndirectedGraph,
-                            boost::edge_weight_t>::type weight_map_t;
-
-typedef boost::unordered_map<
-  int, std::vector<std::pair<int, double> > > anchor_map_t;
-
-template<typename NameMap>
-struct positive_index
-{
-  positive_index() { }
-  positive_index(NameMap names)
-      : names_(names) { }
-
-  template <typename T>
-  bool operator () (const T &v) const
-  { return names_[v] >= 0; }
-
-  NameMap names_;
-};
 
 Point_2
 linear_interpolate(const Point_2 &p0, const Point_2 &p1, double a);
 
 class WalkingGraph
 {
+  friend class InsertAnchor;
+  friend class RangeQuery;
+
+  enum { ANCHORID = 100, OBJECTID = 1000};
+
  public:
 
   WalkingGraph();
@@ -100,7 +83,7 @@ class WalkingGraph
 
   Point_2
   coord(int v) const
-  { return boost::get(coords_, vertices_.at(v)); }
+  { return vp_.at(v).coord; }
 
   Point_2
   coord(const landmark_t &pos) const
@@ -112,18 +95,21 @@ class WalkingGraph
 
   double
   weight(int u, int v) const
-  { return boost::get(weights_,
-                      boost::edge(vertices_.at(u),
-                                  vertices_.at(v), g_).first); }
+  {
+    return ep_.at(
+      boost::get(enames_,
+                 boost::edge(vertices_.at(u),
+                             vertices_.at(v), wg_).first)).weight;
+  }
 
   vertex_color_enum
   color(int v) const
-  { return boost::get(colors_, vertices_.at(v)); }
+  { return vp_.at(v).color; }
 
   template <typename Generator>
   int
   random_vertex(Generator gen) const
-  { return boost::get(vnames_, boost::random_vertex(fg_, gen)); }
+  { return boost::get(vnames_, boost::random_vertex(wg_, gen)); }
 
   int
   random_next(int to, int from = -1) const;
@@ -137,22 +123,8 @@ class WalkingGraph
   std::vector<std::pair<IsoRect_2, double> >
   random_window(double ratio) const;
 
-  void
-  insert_objects(const std::vector<landmark_t> &objects);
-
-  void
-  clear_objects();
-
   int
   detected_by(const landmark_t &pos, double radius);
-
-  boost::unordered_set<int>
-  nearest_neighbors(int object, int k);
-
-  boost::unordered_map<int, double>
-  nearest_neighbors(int object, int k,
-                    boost::unordered_map<
-                    int, boost::unordered_map<int, double> > probs_);
 
   int
   align(const landmark_t &p);
@@ -162,39 +134,34 @@ class WalkingGraph
 
   UndirectedGraph
   operator () ()
-  { return g_; }
+  { return wg_; }
 
   void
   print(std::ostream &os) const;
 
  protected:
-  enum { OBJECT_START=1000 };
-
   void
   initialize();
 
   void
   insert_anchors(double unit = 20.0);
 
-  UndirectedGraph g_;
+  // walkinggraph, anchorgraph
+  UndirectedGraph wg_, ag_;
 
   vertex_name_t vnames_;
-  coord_map_t coords_;
-  color_map_t colors_;
   edge_name_t enames_;
-  weight_map_t weights_;
 
-  boost::filtered_graph<UndirectedGraph,
-                        positive_index<edge_name_t>,
-                        positive_index<vertex_name_t> > fg_;
+  // vertex property
+  boost::unordered_map<int, VP> vp_;
+  // edge property
+  boost::unordered_map<int, EP> ep_;
+  // anchor poiht property
+  boost::unordered_map<int, landmark_t> ap_;
 
-  anchor_map_t anchors_;
-  anchor_map_t objects_;
+  boost::unordered_map<int, Vertex> vertices_;
 
   Point_set_2 anchorset_;
-
-  boost::unordered_map<int, Edge> edges_;
-  boost::unordered_map<int, Vertex> vertices_;
 
   Point_set_2 readerset_;
   boost::unordered_map<int, landmark_t> readermap_;
@@ -208,6 +175,6 @@ class WalkingGraph
   double enter_room_, knock_door_;
 };
 
-}  // namespace simsys
+}  // namespace simulation
 
 #endif  // SRC_WALKINGGRAPH_H_

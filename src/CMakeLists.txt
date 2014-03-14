@@ -1,11 +1,11 @@
 add_library(global STATIC global.cpp global.h)
 add_library(walkinggraph STATIC walkinggraph.cpp walkinggraph.h)
 add_library(particle STATIC particle.cpp particle.h)
-add_library(simulation STATIC simulation.cpp simulation.h)
+add_library(simulator STATIC simulator.cpp simulator.h)
 
 add_executable(main main.cpp)
 
-target_link_libraries(main simulation)
+target_link_libraries(main simulator)
 target_link_libraries(main particle)
 target_link_libraries(main walkinggraph)
 target_link_libraries(main global)

@@ -3,8 +3,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "param.h"
-#include "simulation.h"
+#include "simulator.h"
 
 using namespace std;
 
