@@ -8,6 +8,7 @@
 #include <boost/random/normal_distribution.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/mpl/inserter.hpp>
 
 #include "simulation.h"
 #include "global.h"
@@ -36,6 +37,9 @@ static Point_set_2 objectset_;
 void
 Simulation_impl_::initialize()
 {
+  g_.enter_room(enter_room_prob_);
+  g_.knock_door(knock_door_prob_);
+
   for (int i = 0; i < num_object_; ++i)
     objects_.push_back(Particle(g_, i));
 }
@@ -80,11 +84,8 @@ Simulation_impl_::snapshot(double t)
   {
     std::vector<Point_2> points;
     for (auto it = objects_.begin(); it != objects_.end(); ++it) {
-      auto pos = it->pos(g_);
-      Point_2 p = linear_interpolate(
-          g_.coord(pos.get<0>()), g_.coord(pos.get<1>()),
-          pos.get<2>());
-
+      landmark_t pos = it->pos(g_, t);
+      Point_2 p = g_.coord(pos);
       infos.push_back(std::make_pair(it->id(), pos));
       points.push_back(p);
     }
@@ -106,8 +107,6 @@ Simulation_impl_::snapshot(double t)
     g_.insert_objects(tmp);
   }
 
-  detecting();
-
   for (int i = 0; i < num_object_; ++i)
     predicting(i, t);
 }
@@ -115,13 +114,12 @@ Simulation_impl_::snapshot(double t)
 void
 Simulation_impl_::reset()
 {
-  readings_.clear();
   probs_.clear();
   objectset_.clear();
   g_.clear_objects();
 }
 
-std::vector<int>
+boost::unordered_set<int>
 Simulation_impl_::range_query()
 {
   std::vector<vertex_handle> tmp;
@@ -136,7 +134,7 @@ Simulation_impl_::range_query()
                  [](const vertex_handle vh) {
                    return vh->info().first;
                  });
-  return results;
+  return boost::unordered_set<int>(results.begin(), results.end());
 }
 
 boost::unordered_map<int, double>
@@ -154,16 +152,17 @@ Simulation_impl_::range_query_pred()
   return results;
 }
 
-std::vector<int>
+boost::unordered_set<int>
 Simulation_impl_::nearest_neighbors(int id, int k)
 {
   return g_.nearest_neighbors(id, k);
 }
 
 boost::unordered_map<int, double>
-Simulation_impl_::nearest_neighbors_pred(int k)
+Simulation_impl_::nearest_neighbors_pred(int id, int k)
 {
-  boost::unordered_map<int, double> results;
+  boost::unordered_map<int, double> results =
+      g_.nearest_neighbors(id, k, probs_);
   return results;
 }
 

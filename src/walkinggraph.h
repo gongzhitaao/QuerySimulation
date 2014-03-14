@@ -12,6 +12,7 @@
 
 #include <boost/tuple/tuple.hpp>
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Delaunay_triangulation_2.h>
@@ -89,9 +90,25 @@ class WalkingGraph
 
   WalkingGraph();
 
-  const Point_2 &
+  void
+  enter_room(double p)
+  { enter_room_ = p; }
+
+  void
+  knock_door(double p)
+  { knock_door_ = p; }
+
+  Point_2
   coord(int v) const
   { return boost::get(coords_, vertices_.at(v)); }
+
+  Point_2
+  coord(const landmark_t &pos) const
+  {
+    return linear_interpolate(coord(pos.get<0>()),
+                              coord(pos.get<1>()),
+                              pos.get<2>());
+  }
 
   double
   weight(int u, int v) const
@@ -129,8 +146,13 @@ class WalkingGraph
   int
   detected_by(const landmark_t &pos, double radius);
 
-  std::vector<int>
+  boost::unordered_set<int>
   nearest_neighbors(int object, int k);
+
+  boost::unordered_map<int, double>
+  nearest_neighbors(int object, int k,
+                    boost::unordered_map<
+                    int, boost::unordered_map<int, double> > probs_);
 
   int
   align(const landmark_t &p);
@@ -182,6 +204,8 @@ class WalkingGraph
   std::vector<int> dirs_;
 
   double xmax_, ymax_;
+
+  double enter_room_, knock_door_;
 };
 
 }  // namespace simsys

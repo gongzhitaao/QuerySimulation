@@ -7,6 +7,7 @@
 
 #include <boost/tuple/tuple.hpp>
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 
 #include <CGAL/Point_set_2.h>
 
@@ -44,7 +45,7 @@ class Simulation_impl_
   void
   random_window(double ratio) const;
 
-  std::vector<int>
+  boost::unordered_set<int>
   range_query();
 
   boost::unordered_map<int, double>
@@ -53,11 +54,14 @@ class Simulation_impl_
   int
   random_object();
 
-  std::vector<int>
+  boost::unordered_set<int>
   nearest_neighbors(int id, int k);
 
   boost::unordered_map<int, double>
-  nearest_neighbors_pred(int k);
+  nearest_neighbors_pred(int id, int k);
+
+  void
+  detecting();
 
  protected:
 
@@ -82,9 +86,6 @@ class Simulation_impl_
 
   landmark_t
   random_inside_reader(int i) const;
-
-  void
-  detecting();
 
   bool
   predicting(int obj, double t, int limit = 2);

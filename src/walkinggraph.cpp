@@ -13,7 +13,6 @@
 #include <boost/algorithm/string.hpp>
 
 #include "walkinggraph.h"
-#include "param.h"
 #include "global.h"
 
 namespace simulation {
@@ -300,11 +299,11 @@ WalkingGraph::random_next(int to, int from) const
   boost::random::uniform_real_distribution<> unifd(0, 1);
 
   if (room.size() > 0 && boost::get(colors_, pre) != ROOM &&
-      unifd(gen) < ENTER_ROOM)
+      unifd(gen) < enter_room_)
     return boost::get(vnames_, *room.begin());
 
   if (door.size() > 0 && (boost::get(colors_, cur) == ROOM ||
-                          unifd(gen) < KNOCK_DOOR))
+                          unifd(gen) < knock_door_))
     return boost::get(vnames_, *door.begin());
 
   if (hall.size() > 1) hall.erase(pre);
@@ -448,12 +447,10 @@ WalkingGraph::insert_objects(const std::vector<landmark_t> &objects)
 
         vertices_[vit->first] = v;
 
-        auto pair = boost::add_edge(u, v,
-                                 {id, {w * vit->second - pre}}, g_);
-        if (pair.second)
-          edges_[id] = pair.first;
+        edges_[id] = boost::add_edge(
+            u, v, {id, {w * vit->second - pre}}, g_).first;
         ++id;
-
+        u = v;
         pre = w * vit->second;
       }
     }
@@ -463,8 +460,12 @@ WalkingGraph::insert_objects(const std::vector<landmark_t> &objects)
 void
 WalkingGraph::clear_objects()
 {
-  for (int i = OBJECT_START; i < count_; ++i)
+  for (int i = OBJECT_START; i < count_; ++i) {
+    auto pair = boost::out_edges(vertices_[i], g_);
+    for (auto it = pair.first; it != pair.second; ++it)
+      boost::remove_edge(*it, g_);
     boost::remove_vertex(vertices_[i], g_);
+  }
 
   for (auto it = edge_with_objects_.begin();
        it != edge_with_objects_.end(); ++it) {
@@ -479,7 +480,8 @@ template <typename VertexName>
 struct knn_visitor : public boost::default_bfs_visitor
 {
   // knn_visitor() { }
-  knn_visitor(std::vector<int> &results, int k, VertexName vnames)
+  knn_visitor(boost::unordered_set<int> &results,
+              int k, VertexName vnames)
       : results_(results)
       , count_(k)
       , vnames_(vnames){ }
@@ -492,22 +494,57 @@ struct knn_visitor : public boost::default_bfs_visitor
     if (name >= 1000) {
       --count_;
 
-      results_.push_back(name - 1000);
+      results_.insert(name - 1000);
 
       if (0 == count_)
         throw found_knn();
     }
   }
 
-  std::vector<int> &results_;
+  boost::unordered_set<int> &results_;
   int count_;
   VertexName vnames_;
 };
 
-std::vector<int>
+template <typename VertexName>
+struct knn_prob_visitor : public boost::default_bfs_visitor
+{
+  knn_prob_visitor(boost::unordered_map<int, double> &results,
+                   int k, boost::unordered_map<int,
+                   boost::unordered_map<int, double> > probs,
+                   VertexName vnames)
+      : results_(results)
+      , count_(k)
+      , probs_(probs)
+      , vnames_(vnames) { }
+
+  template <typename Graph>
+  void
+  discover_vertex(const Vertex v, const Graph &g)
+  {
+    int name = boost::get(vnames_, v);
+    if (name < 0) {
+      // This is an anchor point
+      boost::unordered_map<int, double> &map = probs_[name];
+      for (auto i = map.begin(); i != map.end(); ++i) {
+        results_[i->first] += i->second;
+        count_ -= i->second;
+      }
+      if (count_ <= 0.0)
+        throw found_knn();
+    }
+  }
+
+  boost::unordered_map<int, double> &results_;
+  double count_;
+  boost::unordered_map<int, boost::unordered_map<int, double> > probs_;
+  VertexName vnames_;
+};
+
+boost::unordered_set<int>
 WalkingGraph::nearest_neighbors(int object, int k)
 {
-  std::vector<int> results;
+  boost::unordered_set<int> results;
   knn_visitor<vertex_name_t> vis(results, k, vnames_);
 
   try {
@@ -517,6 +554,23 @@ WalkingGraph::nearest_neighbors(int object, int k)
 
   return results;
 }
+
+boost::unordered_map<int, double>
+WalkingGraph::nearest_neighbors(int object, int k,
+                                boost::unordered_map<int,
+                                boost::unordered_map<int, double> >probs)
+{
+  boost::unordered_map<int, double> results;
+  knn_prob_visitor<vertex_name_t> vis(results, k, probs, vnames_);
+
+  try {
+    boost::breadth_first_search(g_, vertices_[OBJECT_START + object],
+                                boost::visitor(vis));
+  } catch (found_knn fk) { }
+
+  return results;
+}
+
 
 void
 WalkingGraph::print(std::ostream &os) const
