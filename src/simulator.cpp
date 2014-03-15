@@ -41,13 +41,9 @@ Simulator_impl_::initialize()
 std::vector<Point_2>
 Simulator_impl_::positions(double t)
 {
-  std::ofstream fout("real.txt");
   std::vector<Point_2> result;
-  for (auto it = objects_.cbegin(); it != objects_.cend(); ++it) {
+  for (auto it = objects_.cbegin(); it != objects_.cend(); ++it)
     result.push_back(g_.coord(it->pos(t)));
-    fout << g_.coord(it->pos(t)) << endl;
-  }
-  fout.close();
   return result;
 }
 
@@ -59,10 +55,6 @@ Simulator_impl_::predict(double t)
 
   for (int i = 0; i < num_object_; ++i)
     predict_(result, i, t);
-
-  std::ofstream fou("object.txt");
-  fou << g_.coord(objects_[0].pos(t)) << endl;
-  fou.close();
 
   return result;
 }
@@ -165,8 +157,6 @@ Simulator_impl_::predict_(
     }
   }
 
-  std::ofstream fout("predict.txt");
-
   // Predicting.  During the *remain*, the object's position is
   // unknown, which is exactly what we'd like to predict.
   double remain = t - end;
@@ -174,11 +164,9 @@ Simulator_impl_::predict_(
   for (auto it = subparticles.begin();
        it != subparticles.end(); ++it) {
     landmark_t p = it->advance(remain);
-    fout << g_.coord(p) << endl;
     out[g_.align(p)][it->id()] += prob;
   }
 
-  fout.close();
   return true;
 }
 

@@ -64,7 +64,7 @@ f1score(const boost::unordered_set<int> &real,
 int main()
 {
   const double DURATION = 200;
-  const int NUM_TIMESTAMP = 10;
+  const int NUM_TIMESTAMP = 100;
 
   typedef boost::accumulators::accumulator_set<
     double, boost::accumulators::features<
@@ -72,24 +72,34 @@ int main()
               boost::accumulators::tag::variance> > accumulators;
 
   using namespace simulation::param;
-  simulation::Simulator sim(_num_object=200);
+  simulation::Simulator sim(_num_object=200, _num_particle=64);
 
   sim.run(DURATION);
 
   simulation::RangeQuery rq(sim);
 
-  rq.random_window(0.01);
-
   accumulators acc;
   boost::random::uniform_real_distribution<>
       unifd(DURATION / 4.0, DURATION * 3.0 / 4.0);
+
   for (int ts = 0; ts < NUM_TIMESTAMP; ++ts) {
+
+    while (true) {
+      if (rq.random_window(0.01))
+        break;
+    }
+
     rq.prepare(unifd(gen));
     boost::unordered_set<int> real = rq.query();
+
+    if (real.empty()) {
+      --ts;
+      continue;
+    }
     boost::unordered_map<int, double> fake = rq.predict();
 
-    if (!real.empty())
-      acc(recall(real, fake));
+    acc(recall(real, fake));
+    cout << ts << '/' << NUM_TIMESTAMP << endl;
   }
 
   cout << boost::accumulators::mean(acc) << ' '

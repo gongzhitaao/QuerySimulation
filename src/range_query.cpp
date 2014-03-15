@@ -9,13 +9,16 @@ using std::cout;
 using std::endl;
 
 static std::vector<std::pair<IsoRect_2, double> > wins_;
+static boost::unordered_map<int, double> anchors_;
 static Point_set_2 objectset_;
-boost::unordered_map<int, boost::unordered_map<int, double> > probs_;
+static boost::unordered_map<
+  int, boost::unordered_map<int, double> > probs_;
 
-void
+bool
 RangeQuery::random_window(double ratio)
 {
   wins_.clear();
+  anchors_.clear();
 
   double r = 1 - std::sqrt(ratio);
   boost::random::uniform_real_distribution<>
@@ -36,6 +39,13 @@ RangeQuery::random_window(double ratio)
       const IsoRect_2 tmp = *boost::get<IsoRect_2>(&*res);
       const IsoRect_2 room = sim_.g_.rooms_[i];
       wins_.push_back(std::make_pair(tmp, tmp.area() / room.area()));
+
+      std::vector<int> anchors =
+          sim_.g_.anchors_in_win(wins_.back().first);
+      double r = wins_.back().second;
+
+      for (auto j = anchors.begin(); j != anchors.end(); ++j)
+        anchors_[*j] = r;
     }
   }
 
@@ -49,14 +59,23 @@ RangeQuery::random_window(double ratio)
         wins_.push_back(std::make_pair(
             IsoRect_2(Point_2(tmp.xmin(), hall.ymin()),
                       Point_2(tmp.xmax(), hall.ymax())),
-            (tmp.ymax() - tmp.ymin()) / (hall.ymax() - hall.ymax())));
+            (tmp.ymax() - tmp.ymin()) / (hall.ymax() - hall.ymin())));
       else
         wins_.push_back(std::make_pair(
             IsoRect_2(Point_2(hall.xmin(), tmp.ymin()),
                       Point_2(hall.xmax(), tmp.ymax())),
             (tmp.xmax() - tmp.xmin()) / (hall.xmax() - hall.xmin())));
+
+      std::vector<int> anchors =
+          sim_.g_.anchors_in_win(wins_.back().first);
+      double r = wins_.back().second;
+
+      for (auto j = anchors.begin(); j != anchors.end(); ++j)
+        anchors_[*j] = r;
     }
   }
+
+  return !anchors_.empty();
 }
 
 void
@@ -99,16 +118,14 @@ boost::unordered_map<int, double>
 RangeQuery::predict()
 {
   boost::unordered_map<int, double> result;
-  for (auto w = wins_.begin(); w != wins_.end(); ++w) {
-    std::vector<int> anchors = sim_.g_.anchors_in_win(w->first);
-    for (auto ac = anchors.begin(); ac != anchors.end(); ++ac) {
-      auto p = probs_.find(*ac);
-      if (p == probs_.end()) continue;
+  for (auto i = anchors_.begin(); i != anchors_.end(); ++i) {
 
-      const boost::unordered_map<int, double> &prob = p->second;
-      for (auto it = prob.begin(); it != prob.end(); ++it)
-        result[it->first] += it->second * w->second;
-    }
+    auto p = probs_.find(i->first);
+    if (p == probs_.end()) continue;
+
+    const boost::unordered_map<int, double> &prob = p->second;
+    for (auto j = prob.begin(); j != prob.end(); ++j)
+      result[j->first] += j->second * i->second;
   }
   return result;
 }

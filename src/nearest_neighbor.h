@@ -1,5 +1,5 @@
-#ifndef RANGE_QUERY_H_
-#define RANGE_QUERY_H_
+#ifndef NEAREST_NEIGHBOR_H_
+#define NEAREST_NEIGHBOR_H_
 
 #pragma once
 
@@ -8,13 +8,11 @@
 
 #include "simulator.h"
 
-namespace simulation {
-
-class RangeQuery
+class NearestNeighbor
 {
  public:
-  RangeQuery(Simulator &sim)
-      :  sim_(sim) { }
+  NearestNeighbor(Simulator &sim)
+      : sim_(sim) { }
 
   void
   prepare(double t);
@@ -25,13 +23,8 @@ class RangeQuery
   boost::unordered_map<int, double>
   predict();
 
-  bool
-  random_window(double ratio);
-
  private:
   Simulator &sim_;
 };
 
-}
-
-#endif  // RANGE_QUERY_H_
+#endif  // NEAREST_NEIGHBOR_H_
