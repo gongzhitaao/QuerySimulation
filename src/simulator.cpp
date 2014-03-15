@@ -41,9 +41,13 @@ Simulator_impl_::initialize()
 std::vector<Point_2>
 Simulator_impl_::positions(double t)
 {
+  std::ofstream fout("real.txt");
   std::vector<Point_2> result;
-  for (auto it = objects_.cbegin(); it != objects_.cend(); ++it)
+  for (auto it = objects_.cbegin(); it != objects_.cend(); ++it) {
     result.push_back(g_.coord(it->pos(t)));
+    fout << g_.coord(it->pos(t)) << endl;
+  }
+  fout.close();
   return result;
 }
 
@@ -56,6 +60,10 @@ Simulator_impl_::predict(double t)
   for (int i = 0; i < num_object_; ++i)
     predict_(result, i, t);
 
+  std::ofstream fou("object.txt");
+  fou << g_.coord(objects_[0].pos(t)) << endl;
+  fou.close();
+
   return result;
 }
 
@@ -63,8 +71,17 @@ landmark_t
 Simulator_impl_::random_inside_reader(int i) const
 {
   landmark_t pos = g_.reader_pos(i);
+
+  boost::random::uniform_real_distribution<> unifd(0, 1);
+
+  if (unifd(gen) > 0.5) {
+    boost::swap(pos.get<0>(), pos.get<1>());
+    pos.get<2>() = 1 - pos.get<2>();
+  }
+
   Particle p(g_, -1, pos);
-  return p.advance(radius_ / p.v());
+
+  return p.advance(radius_ / p.v() * unifd(gen));
 }
 
 void
@@ -84,6 +101,7 @@ Simulator_impl_::run(double duration)
       if (unifd(gen) > success_rate_) tmp.push_back(-1);
       else tmp.push_back(g_.detected_by(objects_[i].pos(j), radius_));
     }
+
     readings_.push_back(tmp);
   }
 }
@@ -147,6 +165,8 @@ Simulator_impl_::predict_(
     }
   }
 
+  std::ofstream fout("predict.txt");
+
   // Predicting.  During the *remain*, the object's position is
   // unknown, which is exactly what we'd like to predict.
   double remain = t - end;
@@ -154,9 +174,11 @@ Simulator_impl_::predict_(
   for (auto it = subparticles.begin();
        it != subparticles.end(); ++it) {
     landmark_t p = it->advance(remain);
+    fout << g_.coord(p) << endl;
     out[g_.align(p)][it->id()] += prob;
   }
 
+  fout.close();
   return true;
 }
 

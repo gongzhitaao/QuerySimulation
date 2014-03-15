@@ -33,6 +33,9 @@ BOOST_PARAMETER_NAME(success_rate)
 
 class Simulator_impl_
 {
+
+  friend class RangeQuery;
+
  public:
 
   void

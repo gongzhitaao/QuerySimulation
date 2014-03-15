@@ -99,7 +99,7 @@ WalkingGraph::initialize()
       double p = std::sqrt(CGAL::squared_distance(p0, p1) /
                            CGAL::squared_distance(p1, p2));
       infos.push_back(id);
-      points.push_back(Point_2(x, y));
+      points.push_back(p0);
       readermap_[id] = {v1, v2, p};
     }
     fin.close();
@@ -370,7 +370,7 @@ WalkingGraph::detected_by(const landmark_t &pos, double radius)
 {
   Point_2 center = linear_interpolate(
       coord(pos.get<0>()), coord(pos.get<1>()), pos.get<2>());
-  Circle_2 circle(center, radius);
+  Circle_2 circle(center, radius * radius);
 
   std::vector<vertex_handle> res;
   readerset_.range_search(circle, std::back_inserter(res));
@@ -386,6 +386,7 @@ WalkingGraph::print(std::ostream &os) const
   // boost::graph_traits<UndirectedGraph>::vertex_iterator vi, end;
   // for (boost::tie(vi, end) = boost::vertices(wg_); vi != end; ++vi)
   //   os << boost::get(coords_, *vi) << std::endl;
+
   boost::graph_traits<UndirectedGraph>::edge_iterator ei, eend;
   for (boost::tie(ei, eend) = boost::edges(wg_); ei != eend; ++ei) {
     Vertex v = boost::source(*ei, wg_);

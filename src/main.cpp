@@ -12,8 +12,9 @@
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
 
-#include "simulator.h"
 #include "global.h"
+#include "simulator.h"
+#include "range_query.h"
 
 using std::cout;
 using std::endl;
@@ -62,49 +63,37 @@ f1score(const boost::unordered_set<int> &real,
 
 int main()
 {
-  const double DURATION = 200.0;
+  const double DURATION = 200;
   const int NUM_TIMESTAMP = 10;
-  const double RATIO = 0.02;
-  const double K = 5;
+
+  typedef boost::accumulators::accumulator_set<
+    double, boost::accumulators::features<
+              boost::accumulators::tag::mean,
+              boost::accumulators::tag::variance> > accumulators;
 
   using namespace simulation::param;
-
   simulation::Simulator sim(_num_object=200);
 
   sim.run(DURATION);
 
-  // typedef boost::accumulators::accumulator_set<
-  //   double, boost::accumulators::features<
-  //             boost::accumulators::tag::mean,
-  //             boost::accumulators::tag::variance> > accumulators;
+  simulation::RangeQuery rq(sim);
 
-  // using namespace simulation::param;
-  // simulation::Simulation sim(_num_object=200);
+  rq.random_window(0.01);
 
-  // sim.run(DURATION);
-  // sim.detecting();
+  accumulators acc;
+  boost::random::uniform_real_distribution<>
+      unifd(DURATION / 4.0, DURATION * 3.0 / 4.0);
+  for (int ts = 0; ts < NUM_TIMESTAMP; ++ts) {
+    rq.prepare(unifd(gen));
+    boost::unordered_set<int> real = rq.query();
+    boost::unordered_map<int, double> fake = rq.predict();
 
-  // accumulators acc;
-  // boost::random::uniform_real_distribution<> unifd(100.0, 200.0);
-  // for (int ts = 0; ts < NUM_TIMESTAMP; ++ts) {
+    if (!real.empty())
+      acc(recall(real, fake));
+  }
 
-  //   sim.snapshot(unifd(gen));
-
-  //   sim.random_window(0.02);
-
-  //   boost::unordered_set<int> real = sim.range_query();
-  //   boost::unordered_map<int, double> fake = sim.range_query_pred();
-
-  //   acc(recall(real, fake));
-
-  //   sim.reset();
-
-  //   cout << "finishing..." << ts << endl;
-  //   cout << boost::accumulators::mean(acc) << ' '
-  //        << boost::accumulators::variance(acc) << endl;
-
-  // }
-
+  cout << boost::accumulators::mean(acc) << ' '
+       << boost::accumulators::variance(acc) << endl;
 
   return 0;
 }

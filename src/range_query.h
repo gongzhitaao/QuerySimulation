@@ -6,18 +6,18 @@
 #include <boost/unordered_set.hpp>
 #include <boost/unordered_map.hpp>
 
-#include "walkinggraph.h"
+#include "simulator.h"
 
 namespace simulation {
 
 class RangeQuery
 {
  public:
-  RangeQuery(const WalkingGraph &g)
-      : g_(g) { }
+  RangeQuery(Simulator &sim)
+      : sim_(sim) { }
 
   void
-  prepare(const std::vector<Point_2> &vec);
+  prepare(double t);
 
   void
   random_window(double ratio);
@@ -26,11 +26,10 @@ class RangeQuery
   query();
 
   boost::unordered_map<int, double>
-  predict(const boost::unordered_map<
-          int, boost::unordered_map<int, double> > &probs);
+  predict();
 
  private:
-  const WalkingGraph &g_;
+  Simulator &sim_;
 };
 
 }
