@@ -4,10 +4,15 @@ add_library(particle STATIC particle.cpp particle.h)
 add_library(simulator STATIC simulator.cpp simulator.h)
 
 add_library(range_query STATIC range_query.cpp range_query.h)
+# add_library(nearest_neighbor STATIC nearest_neighbor.cpp nearest_neighbor.h)
+
+add_library(query range_query)
+# add_library(query range_query nearest_neighbor)
+
 
 add_executable(main main.cpp)
 
-target_link_libraries(main range_query)
+target_link_libraries(main query)
 target_link_libraries(main simulator)
 target_link_libraries(main particle)
 target_link_libraries(main walkinggraph)

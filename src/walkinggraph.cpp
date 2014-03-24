@@ -26,9 +26,43 @@ linear_interpolate(const Point_2 &p0, const Point_2 &p1, double a)
   return p0 + (p1 - p0) * a;
 }
 
+WalkingGraph::graph_::graph_(const WalkingGraph::graph_ &o)
+    :g(o.g)
+{
+  v2n = boost::get(boost::vertex_name, g);
+  n2v.clear();
+  for (auto it = boost::vertices(g); it.first != it.second;
+       ++it.first)
+    n2v[vid(*it.first)] = *it.first;
+
+  e2n = boost::get(boost::edge_name, g);
+  n2e.clear();
+  for (auto it = boost::edges(g); it.first != it.second;
+       ++it.first)
+    n2e[eid(*it.first)] = *it.first;
+}
+
+WalkingGraph::graph_ &
+WalkingGraph::graph_::operator= (const WalkingGraph::graph_ &o)
+{
+  g = o.g;
+
+  v2n = boost::get(boost::vertex_name, g);
+  n2v.clear();
+  for (auto it = boost::vertices(g); it.first != it.second;
+       ++it.first)
+    n2v[vid(*it.first)] = *it.first;
+
+  e2n = boost::get(boost::edge_name, g);
+  n2e.clear();
+  for (auto it = boost::edges(g); it.first != it.second;
+       ++it.first)
+    n2e[eid(*it.first)] = *it.first;
+
+  return *this;
+}
+
 WalkingGraph::WalkingGraph()
-    : vnames_(boost::get(boost::vertex_name, wg_))
-    , enames_(boost::get(boost::edge_name, wg_))
 {
   initialize();
   insert_anchors();
@@ -53,8 +87,7 @@ WalkingGraph::initialize()
       int name, type;
       double x, y;
       ss >> name >> x >> y >> type;
-      vertices_[name] = boost::add_vertex(name, wg_);
-      vertices_[name] = boost::add_vertex(name, ag_);
+      wg_.addv(name);
       vp_[name] = {Point_2(x, y), (vertex_color_enum) type};
     }
     fin.close();
@@ -71,8 +104,7 @@ WalkingGraph::initialize()
       std::stringstream ss(line);
       int n1, n2;
       ss >> n1 >> n2;
-      boost::add_edge(vertices_.at(n1), vertices_.at(n2), id, wg_);
-      boost::add_edge(vertices_.at(n1), vertices_.at(n2), id, ag_);
+      wg_.adde(n1, n2, id);
       ep_[id].weight = std::sqrt(
           CGAL::squared_distance(coord(n1), coord(n2)));
     }
@@ -164,19 +196,19 @@ class InsertAnchor : public boost::default_bfs_visitor
   {
     Vertex source = boost::source(e, g),
            target = boost::target(e, g);
-    int id = boost::get(g_.enames_, e);
+    int id = g_.wg_.eid(e);
 
     double d = dist_[source],
            w = g_.ep_.at(id).weight;
 
     g_.ep_.at(id).anchors.push_back(
-        std::make_pair(boost::get(g_.vnames_, source), 0.0));
+        std::make_pair(g_.wg_.vid(source), 0.0));
     while (d < w) {
       g_.ep_.at(id).anchors.push_back(std::make_pair(name_++, d / w));
       d += unit_;
     }
     g_.ep_.at(id).anchors.push_back(
-        std::make_pair(boost::get(g_.vnames_, target), 1.0));
+        std::make_pair(g_.wg_.vid(target), 1.0));
     dist_[target] = d - w;
   }
 
@@ -192,40 +224,42 @@ WalkingGraph::insert_anchors(double unit)
 {
   // calculate the anchor points in a bfs fashion
   InsertAnchor vis(*this, 20);
-  boost::breadth_first_search(wg_, boost::random_vertex(wg_, gen),
+  boost::breadth_first_search(wg_(), boost::random_vertex(wg_(), gen),
                               boost::visitor(vis));
 
-  int id = boost::num_edges(ag_);
+  ag_ = wg_;
+
+  int id = boost::num_edges(ag_());
 
   std::vector<int> infos;
   std::vector<Point_2> points;
 
-  for (auto it = boost::edges(wg_); it.first != it.second;
+  for (auto it = boost::edges(wg_()); it.first != it.second;
        ++it.first, ++id) {
 
     const std::vector<std::pair<int, double> > &vec =
-        ep_.at(boost::get(enames_, *it.first)).anchors;
-    if (vec.size() <= 2) continue;
-
-    Vertex source = vertices_[vec[0].first],
-           target = vertices_[vec.back().first],
-                u = source;
-
-    double w = weight(vec[0].first, vec.back().first);
+        ep_.at(wg_.eid(*it.first)).anchors;
     int size = vec.size();
 
-    boost::remove_edge(source, target, ag_);
+    if (size <= 2) continue;
+
+    Vertex source = ag_.v(vec[0].first),
+           target = ag_.v(vec.back().first),
+                u = source;
+
+    int from = vec[0].first,
+          to = vec.back().first;
+
+    double w = weight(vec[0].first, vec.back().first);
+    boost::remove_edge(source, target, ag_());
 
     for (int i = 1; i < size - 1; ++i) {
-      int from = boost::get(vnames_, source),
-            to = boost::get(vnames_, target);
       Point_2 p = linear_interpolate(coord(from),
                                      coord(to), vec[i].second);
 
-      Vertex v = boost::add_vertex(vec[i].first, ag_);
+      Vertex v = ag_.addv(vec[i].first);
       vertex_color_enum c = HALL;
       if (color(from) == ROOM || color(to) == ROOM) c = ROOM;
-      vertices_[vec[i].first] = v;
 
       vp_[vec[i].first] = {p, c};
       ap_[vec[i].first] = {from, to, vec[i].second};
@@ -233,19 +267,19 @@ WalkingGraph::insert_anchors(double unit)
       points.push_back(p);
       infos.push_back(vec[i].first);
 
-      boost::add_edge(u, v, id, ag_);
+      ag_.adde(u, v, id);
       ep_[id].weight = w * (vec[i].second - vec[i-1].second);
 
       u = v;
     }
 
-    boost::add_edge(u, vertices_[vec.back().first], id, ag_);
+    ag_.adde(u, ag_.v(vec.back().first), id);
     ep_[id].weight = w * (1 - vec[size-2].second);
   }
 
-  for (auto it = boost::vertices(wg_); it.first != it.second;
+  for (auto it = boost::vertices(ag_()); it.first != it.second;
        ++it.first) {
-    int name = boost::get(vnames_, *it.first);
+    int name = ag_.vid(*it.first);
     infos.push_back(name);
     points.push_back(coord(name));
   }
@@ -264,15 +298,15 @@ WalkingGraph::insert_anchors(double unit)
 int
 WalkingGraph::random_next(int to, int from) const
 {
-  Vertex cur = vertices_.at(to);
-  Vertex pre = from < 0 ? wg_.null_vertex() : vertices_.at(from);
+  Vertex cur = wg_.v(to);
+  Vertex pre = from < 0 ? wg_().null_vertex() : wg_.v(from);
 
   boost::unordered_set<Vertex> hall, door, room;
 
-  auto pit = boost::out_edges(cur, wg_);
+  auto pit = boost::out_edges(cur, wg_());
   for (auto it = pit.first; it != pit.second; ++it) {
-    Vertex v = boost::target(*it, wg_);
-    switch (color(boost::get(vnames_, v))) {
+    Vertex v = boost::target(*it, wg_());
+    switch (color(wg_.vid(v))) {
       case HALL: hall.insert(v); break;
       case DOOR: door.insert(v); break;
       case ROOM: room.insert(v); break;
@@ -280,39 +314,38 @@ WalkingGraph::random_next(int to, int from) const
     }
   }
 
-  if (hall.size() == 0 || wg_.null_vertex() == pre) {
+  if (hall.size() == 0 || wg_().null_vertex() == pre) {
     if (hall.size() > 0) {
       boost::random::uniform_int_distribution<>
           unifi(0, hall.size() - 1);
-      return boost::get(vnames_,
-                        *boost::next(hall.begin(), unifi(gen)));
+      return wg_.vid(*boost::next(hall.begin(), unifi(gen)));
     }
-    return boost::get(vnames_, *door.begin());
+    return wg_.vid(*door.begin());
   }
 
   boost::random::uniform_real_distribution<> unifd(0, 1);
 
-  if (room.size() > 0 && color(boost::get(vnames_, pre)) != ROOM &&
+  if (room.size() > 0 && color(wg_.vid(pre)) != ROOM &&
       unifd(gen) < enter_room_)
-    return boost::get(vnames_, *room.begin());
+    return wg_.vid(*room.begin());
 
-  if (door.size() > 0 && (color(boost::get(vnames_, cur)) == ROOM ||
+  if (door.size() > 0 && (color(wg_.vid(cur)) == ROOM ||
                           unifd(gen) < knock_door_))
-    return boost::get(vnames_, *door.begin());
+    return wg_.vid(*door.begin());
 
   if (hall.size() > 1) hall.erase(pre);
 
   boost::random::uniform_int_distribution<> unifi(0, hall.size() - 1);
-  return boost::get(vnames_, *boost::next(hall.begin(), unifi(gen)));
+  return wg_.vid(*boost::next(hall.begin(), unifi(gen)));
 }
 
 landmark_t
 WalkingGraph::random_pos() const
 {
-  Edge e = boost::random_edge(wg_, gen);
+  Edge e = boost::random_edge(wg_(), gen);
   boost::random::uniform_real_distribution<> unifd(0, 1);
-  return boost::make_tuple(vnames_[boost::source(e, wg_)],
-                           vnames_[boost::target(e, wg_)],
+  return boost::make_tuple(wg_.vid(boost::source(e, wg_())),
+                           wg_.vid(boost::target(e, wg_())),
                            unifd(gen));
 }
 
@@ -388,11 +421,10 @@ WalkingGraph::print(std::ostream &os) const
   //   os << boost::get(coords_, *vi) << std::endl;
 
   boost::graph_traits<UndirectedGraph>::edge_iterator ei, eend;
-  for (boost::tie(ei, eend) = boost::edges(wg_); ei != eend; ++ei) {
-    Vertex v = boost::source(*ei, wg_);
-    Vertex u = boost::target(*ei, wg_);
-    os << coord(boost::get(vnames_, v)) << ' '
-       << coord(boost::get(vnames_, u)) << endl;
+  for (boost::tie(ei, eend) = boost::edges(wg_()); ei != eend; ++ei) {
+    Vertex v = boost::source(*ei, wg_());
+    Vertex u = boost::target(*ei, wg_());
+    os << coord(wg_.vid(v)) << ' ' << coord(wg_.vid(u)) << endl;
   }
 }
 

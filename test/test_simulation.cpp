@@ -3,7 +3,10 @@
 #include <fstream>
 #include <iostream>
 
+#include "global.h"
 #include "simulator.h"
+#include "range_query.h"
+#include "nearest_neighbor.h"
 
 using namespace std;
 
@@ -16,24 +19,33 @@ simulation::WalkingGraph SimulationTest::g;
 
 TEST_F(SimulationTest, walkinggraph)
 {
-  ofstream fout("edge.txt");
-  g.print(fout);
-  fout.close();
+  simulation::WalkingGraph g_copy = g;
+  using namespace simulation;
+
+  Edge e = g.wg_.e(2);
+  int s = g.wg_.vid(boost::source(e, g_copy.wg_()));
+  int d = g.wg_.vid(boost::target(e, g_copy.wg_()));
+
+  cout << boost::edge(g.wg_.v(s), g.wg_.v(d), g.wg_()).second << '/'
+       << boost::edge(g_copy.wg_.v(s), g_copy.wg_.v(d), g_copy.wg_()).second << endl;
+  boost::remove_edge(g_copy.wg_.e(2), g_copy.wg_());
+  cout << boost::edge(g.wg_.v(s), g.wg_.v(d), g.wg_()).second << '/'
+       << boost::edge(g_copy.wg_.v(s), g_copy.wg_.v(d), g_copy.wg_()).second << endl;
 }
 
 TEST_F(SimulationTest, particle_advance)
 {
   simulation::Particle p(g, -1);
-  p.advance(g, 100);
+  p.advance(100);
   p.print(cout);
 }
 
 TEST_F(SimulationTest, particle_pos)
 {
   simulation::Particle p(g, -1);
-  p.advance(g, 100);
+  p.advance(100);
   for (double t = 1.0; t < 100.0; t += 1.0)
-    cout << g.coord(p.pos(g, t)) << endl;
+    cout << g.coord(p.pos(t)) << endl;
 }
 
 TEST_F(SimulationTest, random_pos)
@@ -45,61 +57,39 @@ TEST_F(SimulationTest, random_pos)
   }
 }
 
-TEST_F(SimulationTest, knn)
-{
-  using namespace simulation::param;
-  simulation::Simulation sim(_num_object=200);
-
-  sim.run(200);
-  sim.snapshot(100);
-
-  int object = sim.random_object();
-
-  boost::unordered_set<int> nn = sim.nearest_neighbors(object, 5);
-  for (auto i = nn.begin(); i != nn.end(); ++i)
-    cout << *i << ' ';
-  cout << endl;
-
-  sim.reset();
-}
-
-TEST_F(SimulationTest, knn_pred)
-{
-  using namespace simulation::param;
-  simulation::Simulation sim(_num_object=200);
-
-  sim.run(200);
-  sim.snapshot(100);
-
-  int object = sim.random_object();
-
-  boost::unordered_map<int, double> nn =
-      sim.nearest_neighbors_pred(object, 5);
-  for (auto i = nn.begin(); i != nn.end(); ++i)
-    cout << i->first << ' '<< i->second << endl;
-
-  sim.reset();
-}
-
 TEST_F(SimulationTest, range_query)
 {
   using namespace simulation::param;
-  simulation::Simulation sim(_num_object=200);
+  simulation::Simulator sim(_num_object=200, _num_particle=64);
 
   sim.run(200);
-  sim.snapshot(100);
 
-  sim.random_window(0.01);
-  boost::unordered_set<int> results = sim.range_query();
-  for (auto i = results.begin(); i != results.end(); ++i)
-    cout << *i << ' ';
-  cout << endl;
+  simulation::RangeQuery rq(sim);
 
-  sim.reset();
+  while (true) {
+    if (rq.random_window(0.01))
+      break;
+  }
+
+  rq.prepare(100);
+  boost::unordered_set<int> real = rq.query();
+  boost::unordered_map<int, double> fake = rq.predict();
 }
 
+// TEST_F(SimulationTest, knn)
+// {
+//   using namespace simulation::param;
+//   simulation::Simulator sim(_num_object=200, _num_particle=64);
+
+//   sim.run(200);
+
+//   simulation::NearestNeighbor nn(sim);
+
+//   nn.prepare(10.0);
+// }
+
 int main(int argc, char** argv) {
-  ::testing::GTEST_FLAG(filter) = "*particle_pos";
+  ::testing::GTEST_FLAG(filter) = "*walkinggraph";
   // This allows the user to override the flag on the command line.
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

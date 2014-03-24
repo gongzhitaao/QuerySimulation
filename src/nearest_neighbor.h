@@ -8,23 +8,32 @@
 
 #include "simulator.h"
 
+namespace simulation {
+
 class NearestNeighbor
 {
  public:
-  NearestNeighbor(Simulator &sim)
-      : sim_(sim) { }
+  NearestNeighbor(Simulator &sim);
 
   void
   prepare(double t);
 
   boost::unordered_set<int>
-  query();
+  query(int k);
 
   boost::unordered_map<int, double>
-  predict();
+  predict(int k);
+
+  void
+  random_object();
 
  private:
+  void
+  copy_graph();
+
   Simulator &sim_;
 };
+
+}
 
 #endif  // NEAREST_NEIGHBOR_H_

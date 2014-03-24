@@ -61,14 +61,15 @@ f1score(const boost::unordered_set<int> &real,
       : 2.0 * b * a / (b + a);
 }
 
-int main()
+void
+test_range_query()
 {
   const double DURATION = 200;
   const int NUM_TIMESTAMP = 100;
 
   typedef boost::accumulators::accumulator_set<
     double, boost::accumulators::features<
-              boost::accumulators::tag::mean,
+      boost::accumulators::tag::mean,
               boost::accumulators::tag::variance> > accumulators;
 
   using namespace simulation::param;
@@ -105,5 +106,15 @@ int main()
   cout << boost::accumulators::mean(acc) << ' '
        << boost::accumulators::variance(acc) << endl;
 
+}
+
+void
+test_knn()
+{
+}
+
+int main()
+{
+  test_range_query();
   return 0;
 }

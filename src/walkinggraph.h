@@ -49,8 +49,8 @@ struct EP {
 typedef boost::property<boost::vertex_name_t, int> VertexProperty;
 typedef boost::property<boost::edge_name_t, int> EdgeProperty;
 
-typedef boost::undirected_graph<
-  VertexProperty, EdgeProperty> UndirectedGraph;
+typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
+                              VertexProperty, EdgeProperty> UndirectedGraph;
 typedef boost::graph_traits<UndirectedGraph>::vertex_descriptor Vertex;
 typedef boost::graph_traits<UndirectedGraph>::edge_descriptor Edge;
 
@@ -66,8 +66,79 @@ class WalkingGraph
 {
   friend class InsertAnchor;
   friend class RangeQuery;
+  friend class NearestNeighbor;
 
   enum { ANCHORID = 100, OBJECTID = 1000};
+
+  class graph_
+  {
+   public:
+    graph_()
+        : v2n(boost::get(boost::vertex_name, g))
+        , e2n(boost::get(boost::edge_name, g))
+    { }
+
+    graph_(const graph_ &o);
+
+    graph_ &
+    operator= (const graph_ &o);
+
+    UndirectedGraph &
+    operator() ()
+    { return g; }
+
+    const UndirectedGraph &
+    operator() () const
+    { return g; }
+
+    UndirectedGraph g;
+
+    vertex_name_t v2n;
+    boost::unordered_map<int, Vertex> n2v;
+
+    edge_name_t e2n;
+    boost::unordered_map<int, Edge> n2e;
+
+    Vertex
+    v(int id) const
+    { return n2v.at(id); }
+
+    Vertex &
+    v(int id)
+    { return n2v.at(id); }
+
+    Vertex
+    addv(int id)
+    { return n2v[id] = boost::add_vertex(id, g); }
+
+    int
+    vid(Vertex v) const
+    { return boost::get(v2n, v); }
+
+    Edge
+    e(int id) const
+    { return n2e.at(id); }
+
+    Edge &
+    e(int id)
+    { return n2e.at(id); }
+
+    Edge
+    e(int s, int d) const
+    { return boost::edge(v(s), v(d), g).first; }
+
+    int
+    eid(Edge e) const
+    { return boost::get(e2n, e); }
+
+    Edge
+    adde(int s, int d, int id)
+    { return n2e[id] = boost::add_edge(v(s), v(d), id, g).first; }
+
+    Edge
+    adde(Vertex s, Vertex d, int id)
+    { return n2e[id] = boost::add_edge(s, d, id, g).first; }
+  };
 
  public:
 
@@ -95,12 +166,7 @@ class WalkingGraph
 
   double
   weight(int u, int v) const
-  {
-    return ep_.at(
-      boost::get(enames_,
-                 boost::edge(vertices_.at(u),
-                             vertices_.at(v), wg_).first)).weight;
-  }
+  { return ep_.at(wg_.eid(wg_.e(u, v))).weight; }
 
   vertex_color_enum
   color(int v) const
@@ -109,7 +175,7 @@ class WalkingGraph
   template <typename Generator>
   int
   random_vertex(Generator gen) const
-  { return boost::get(vnames_, boost::random_vertex(wg_, gen)); }
+  { return wg_.vid(boost::random_vertex(wg_(), gen)); }
 
   int
   random_next(int to, int from = -1) const;
@@ -129,17 +195,18 @@ class WalkingGraph
   int
   align(const landmark_t &p);
 
+
   std::vector<int>
   anchors_in_win(const IsoRect_2 &w);
 
-  UndirectedGraph
-  operator () ()
-  { return wg_; }
+  // const UndirectedGraph &
+  // operator () ()
+  // { return wg_; }
 
   void
   print(std::ostream &os) const;
 
- protected:
+ // protected:
   void
   initialize();
 
@@ -147,10 +214,7 @@ class WalkingGraph
   insert_anchors(double unit = 20.0);
 
   // walkinggraph, anchorgraph
-  UndirectedGraph wg_, ag_;
-
-  vertex_name_t vnames_;
-  edge_name_t enames_;
+  graph_ wg_, ag_;
 
   // vertex property
   boost::unordered_map<int, VP> vp_;
@@ -158,8 +222,6 @@ class WalkingGraph
   boost::unordered_map<int, EP> ep_;
   // anchor poiht property
   boost::unordered_map<int, landmark_t> ap_;
-
-  boost::unordered_map<int, Vertex> vertices_;
 
   Point_set_2 anchorset_;
 

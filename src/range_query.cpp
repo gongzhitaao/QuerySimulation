@@ -81,12 +81,15 @@ RangeQuery::random_window(double ratio)
 void
 RangeQuery::prepare(double t)
 {
-  std::vector<Point_2> points = sim_.positions(t);
-  probs_ = sim_.predict(t);
-
+  std::vector<landmark_t> tmp = sim_.positions(t);
+  std::vector<Point_2> points;
   std::vector<int> infos;
-  for (size_t i = 0; i < points.size(); ++i)
+  for (size_t i = 0; i < tmp.size(); ++i) {
+    points.push_back(sim_.g_.coord(tmp[i]));
     infos.push_back(i);
+  }
+
+  probs_ = sim_.predict(t);
 
   objectset_.clear();
   objectset_.insert(

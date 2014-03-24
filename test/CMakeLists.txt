@@ -2,6 +2,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 
 add_executable(test_simulation test_simulation.cpp)
 
+target_link_libraries(test_simulation query)
 target_link_libraries(test_simulation simulator)
 target_link_libraries(test_simulation particle)
 target_link_libraries(test_simulation walkinggraph)

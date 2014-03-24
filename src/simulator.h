@@ -35,13 +35,14 @@ class Simulator_impl_
 {
 
   friend class RangeQuery;
+  friend class NearestNeighbor;
 
  public:
 
   void
   run(double duration);
 
-  std::vector<Point_2>
+  std::vector<landmark_t>
   positions(double t);
 
   boost::unordered_map<int, boost::unordered_map<int, double> >

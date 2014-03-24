@@ -38,12 +38,12 @@ Simulator_impl_::initialize()
     objects_.push_back(Particle(g_, i));
 }
 
-std::vector<Point_2>
+std::vector<landmark_t>
 Simulator_impl_::positions(double t)
 {
-  std::vector<Point_2> result;
+  std::vector<landmark_t> result;
   for (auto it = objects_.cbegin(); it != objects_.cend(); ++it)
-    result.push_back(g_.coord(it->pos(t)));
+    result.push_back(it->pos(t));
   return result;
 }
 
