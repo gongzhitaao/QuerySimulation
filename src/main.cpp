@@ -151,6 +151,5 @@ test_knn()
 
 int main()
 {
-  test_knn();
   return 0;
 }

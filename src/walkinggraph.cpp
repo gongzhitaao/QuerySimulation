@@ -17,9 +17,6 @@
 
 namespace simulation {
 
-using std::cout;
-using std::endl;
-
 Point_2
 linear_interpolate(const Point_2 &p0, const Point_2 &p1, double a)
 {
@@ -424,7 +421,7 @@ WalkingGraph::print(std::ostream &os) const
   for (boost::tie(ei, eend) = boost::edges(wg_()); ei != eend; ++ei) {
     Vertex v = boost::source(*ei, wg_());
     Vertex u = boost::target(*ei, wg_());
-    os << coord(wg_.vid(v)) << ' ' << coord(wg_.vid(u)) << endl;
+    os << coord(wg_.vid(v)) << ' ' << coord(wg_.vid(u)) << std::endl;
   }
 }
 
