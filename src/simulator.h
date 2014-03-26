@@ -1,11 +1,15 @@
-#ifndef SIMULATION_H_
-#define SIMULATION_H_
+#ifndef SIMULATOR_H_
+#define SIMULATOR_H_
+
+#pragma once
 
 #include <boost/parameter/name.hpp>
 #include <boost/parameter/preprocessor.hpp>
 #include <boost/parameter/keyword.hpp>
 
 #include <boost/tuple/tuple.hpp>
+#include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 
 #include <CGAL/Point_set_2.h>
 
@@ -27,45 +31,31 @@ BOOST_PARAMETER_NAME(success_rate)
 
 }
 
-class Simulation_impl_
+class Simulator_impl_
 {
+
+  friend class RangeQuery;
+  friend class NearestNeighbor;
+
  public:
 
   void
   run(double duration);
 
-  void
-  snapshot(double t);
+  std::vector<landmark_t>
+  positions(double t);
 
-  void
-  reset();
-
-  void
-  random_window(double ratio) const;
-
-  std::vector<int>
-  range_query();
-
-  std::map<int, double>
-  range_query_pred();
-
-  int
-  random_object();
-
-  std::vector<int>
-  nearest_neighbors(int id, int k);
-
-  std::map<int, double>
-  nearest_neighbors_pred(int k);
+  boost::unordered_map<int, boost::unordered_map<int, double> >
+  predict(double t);
 
  protected:
 
-  Simulation_impl_() {}
+  Simulator_impl_() {}
 
   template <class ArgumentPack>
-  Simulation_impl_(const ArgumentPack &args)
+  Simulator_impl_(const ArgumentPack &args)
       : num_object_(args[param::_num_object])
-      , num_particle_(args[param::_num_particle | 128])
+      , num_particle_(args[param::_num_particle | 64])
       , radius_(args[param::_radius | 120.0])
       , unit_(args[param::_unit | 20])
       , knock_door_prob_(args[param::_knock_door_prob | 0.1])
@@ -82,10 +72,10 @@ class Simulation_impl_
   landmark_t
   random_inside_reader(int i) const;
 
-  void
-  detect();
-
- private:
+  bool
+  predict_(boost::unordered_map<
+           int, boost::unordered_map<int, double> > &out,
+           int obj, double t, int limit = 2);
 
   // system parameters
   int num_object_;
@@ -103,11 +93,11 @@ class Simulation_impl_
   std::vector<Particle> objects_;
 };
 
-class Simulation : public Simulation_impl_
+class Simulator : public Simulator_impl_
 {
  public:
   BOOST_PARAMETER_CONSTRUCTOR(
-      Simulation, (Simulation_impl_), param::tag,
+      Simulator, (Simulator_impl_), param::tag,
       (required
        (num_object, *))
       (optional
@@ -121,4 +111,4 @@ class Simulation : public Simulation_impl_
 
 }
 
-#endif  // SIMULATION_H_
+#endif  // SIMULATOR_H_
