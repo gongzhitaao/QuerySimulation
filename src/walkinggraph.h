@@ -68,7 +68,7 @@ class WalkingGraph
   friend class RangeQuery;
   friend class NearestNeighbor;
 
-  enum { ANCHORID = 100, OBJECTID = 1000};
+  enum { ANCHORID = 100, OBJECTID = 1000, USEREDGE = 10000};
 
   class graph_
   {

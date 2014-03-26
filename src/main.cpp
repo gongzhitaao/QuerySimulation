@@ -15,6 +15,7 @@
 #include "global.h"
 #include "simulator.h"
 #include "range_query.h"
+#include "nearest_neighbor.h"
 
 using std::cout;
 using std::endl;
@@ -73,7 +74,7 @@ test_range_query()
               boost::accumulators::tag::variance> > accumulators;
 
   using namespace simulation::param;
-  simulation::Simulator sim(_num_object=200, _num_particle=64);
+  simulation::Simulator sim(_num_object=200);
 
   sim.run(DURATION);
 
@@ -111,10 +112,45 @@ test_range_query()
 void
 test_knn()
 {
+  const double DURATION = 200;
+  const int NUM_TIMESTAMP = 100;
+
+  typedef boost::accumulators::accumulator_set<
+    double, boost::accumulators::features<
+      boost::accumulators::tag::mean,
+              boost::accumulators::tag::variance> > accumulators;
+
+  using namespace simulation::param;
+  simulation::Simulator sim(_num_object=200);
+
+  sim.run(DURATION);
+
+  simulation::NearestNeighbor nn(sim);
+
+  accumulators acc;
+  boost::random::uniform_real_distribution<>
+      unifd(DURATION / 4.0, DURATION * 3.0 / 4.0);
+
+  for (int ts = 0; ts < NUM_TIMESTAMP; ++ts) {
+
+    nn.random_object();
+
+    nn.prepare(unifd(gen));
+
+    boost::unordered_set<int> real = nn.query(50);
+    boost::unordered_map<int, double> fake = nn.predict(50);
+
+    acc(recall(real, fake));
+    cout << ts << '/' << NUM_TIMESTAMP << endl;
+  }
+
+  cout << boost::accumulators::mean(acc) << ' '
+       << boost::accumulators::variance(acc) << endl;
+
 }
 
 int main()
 {
-  test_range_query();
+  test_knn();
   return 0;
 }

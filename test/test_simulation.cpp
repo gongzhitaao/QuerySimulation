@@ -76,20 +76,20 @@ TEST_F(SimulationTest, range_query)
   boost::unordered_map<int, double> fake = rq.predict();
 }
 
-// TEST_F(SimulationTest, knn)
-// {
-//   using namespace simulation::param;
-//   simulation::Simulator sim(_num_object=200, _num_particle=64);
+TEST_F(SimulationTest, knn)
+{
+  using namespace simulation::param;
+  simulation::Simulator sim(_num_object=200, _num_particle=64);
 
-//   sim.run(200);
+  sim.run(200);
 
-//   simulation::NearestNeighbor nn(sim);
+  simulation::NearestNeighbor nn(sim);
 
-//   nn.prepare(10.0);
-// }
+  nn.prepare(10.0);
+}
 
 int main(int argc, char** argv) {
-  ::testing::GTEST_FLAG(filter) = "*walkinggraph";
+  ::testing::GTEST_FLAG(filter) = "*knn";
   // This allows the user to override the flag on the command line.
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

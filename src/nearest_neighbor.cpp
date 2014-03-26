@@ -13,179 +13,153 @@ namespace simulation {
 using std::cout;
 using std::endl;
 
-template <typename W, typename ID>
-class weight_map
+template <typename ID, typename W>
+class WeightMap
 {
  public:
   typedef typename boost::property_traits<ID>::key_type key_type;
   typedef typename W::mapped_type value_type;
   typedef typename W::mapped_type &reference;
+
   typedef boost::lvalue_property_map_tag category;
 
-  weight_map()
-      : id_(0), w_(0){ }
+  WeightMap(ID a = ID(), W b = W())
+      : id(a), w(b) { }
 
-  weight_map(const ID *id, W *w = 0)
-      : id_(id), w_(w) { }
-
-  void
-  clear()
-  {
-    w_->clear();
-  }
-
-  const ID *id_;
-  W *w_;
+  ID id;
+  W w;
 };
 
-template <typename W, typename ID>
-weight_map<W, ID>
-make_my_weight_map(const ID *id, W *w = 0)
-{
-  return weight_map<W, ID>(id, w);
-}
-
-template <typename W, typename ID>
+template <typename ID, typename W>
 typename W::mapped_type
-get(const weight_map<W, ID> &w,
-    typename boost::property_traits<ID>::key_type key)
-{
-  return w.w_->at((*w.id_)[key]);
-}
+get(const WeightMap<ID, W> &w,
+    typename boost::property_traits<ID>::key_type e)
+{ return w.w.at(boost::get(w.id, e)); }
 
-template <typename W, typename ID>
+template <typename ID, typename W>
 void
-put(weight_map<W, ID> &w,
-    typename boost::property_traits<ID>::key_type key,
-    const typename W::mapped_type &value)
-{
-  (*w.w_)[(*w.id_)[key]] = value;
-}
+put(WeightMap<ID, W> &w,
+    typename boost::property_traits<ID>::key_type e,
+    const typename W::mapped_type &d)
+{ w.w[boost::get(w.id, e)] = d; }
 
-template <typename W, typename ID>
+template <typename ID, typename W>
 typename W::mapped_type &
-at(const weight_map<W, ID> &w,
-   typename boost::property_traits<ID>::key_type key)
-{
-  return w.w_->at((*w.id_)[key]);
-}
+at(const WeightMap<ID, W> &w,
+   typename boost::property_traits<ID>::key_type e)
+{ return w.w.at(boost::get(w.id, e)); }
 
-typedef weight_map<boost::unordered_map<int, double>,
-                   edge_name_t> WeightMap;
-
-static int object_;
+static WalkingGraph g_;
 static boost::unordered_map<
   int, std::vector<std::pair<int, double> > > landmarks_;
-
-static UndirectedGraph g_copy_;
-static UndirectedGraph a_copy_;
-static edge_name_t enames_;
-static boost::unordered_map<int, Edge> edges_;
-static vertex_name_t vnames_;
-static boost::unordered_map<int, Vertex> vertices_;
-static WeightMap weights_;
-static int idbase_;
+static WeightMap<
+  edge_name_t, boost::unordered_map<int, double> > w0_, w1_;
+static int object_;
+static boost::unordered_map<
+  int, boost::unordered_map<int, double> > probs_;
 
 NearestNeighbor::NearestNeighbor(Simulator &sim)
     : sim_(sim)
 {
-  boost::copy_graph(sim_.g_.ag_, a_copy_);
-  // for (auto i = boost::edges(a_copy_); i.first != i.second;
-  //      ++i.first)
-}
+  g_ = sim.g_;
 
-void
-NearestNeighbor::copy_graph()
-{
-  g_copy_.clear();
+  w0_ = WeightMap<edge_name_t,
+                  boost::unordered_map<int, double> >(g_.wg_.e2n);
+  w1_ = WeightMap<edge_name_t,
+                  boost::unordered_map<int, double> >(g_.ag_.e2n);
 
-  edges_.clear();
-  vertices_.clear();
-
-  boost::copy_graph(sim_.g_.wg_, g_copy_);
-
-  enames_ = boost::get(boost::edge_name, g_copy_);
-  for (auto i = boost::edges(g_copy_); i.first != i.second;
+  for (auto i = boost::edges(g_.wg_()); i.first != i.second;
        ++i.first)
-    edges_[enames_[*(i.first)]] = *(i.first);
+    put(w0_, *i.first, g_.ep_.at(g_.wg_.eid(*i.first)).weight);
 
-  vnames_ = boost::get(boost::vertex_name, g_copy_);
-  for (auto i = boost::vertices(g_copy_); i.first != i.second;
+  for (auto i = boost::edges(g_.ag_()); i.first != i.second;
        ++i.first)
-    vertices_[vnames_[*(i.first)]] = *(i.first);
-
-  weights_ = make_my_weight_map<boost::unordered_map<int, double>,
-                                edge_name_t>(&enames_);
-
-  for (auto i = sim_.g_.ep_.begin(); i != sim_.g_.ep_.end(); ++i) {
-    cout << i->first << endl;
-    put(weights_, edges_.at(i->first), i->second.weight);
-  }
-
-  cout << "helo" << endl;
+    put(w1_, *i.first, g_.ep_.at(g_.ag_.eid(*i.first)).weight);
 }
 
 void
 NearestNeighbor::random_object()
 {
-  boost::random::uniform_int_distribution<> unifd(0, sim_.num_object_);
+  boost::random::uniform_int_distribution<> unifd(0, sim_.num_object_ - 1);
   object_ = unifd(gen);
 }
 
 void
 NearestNeighbor::prepare(double t)
 {
-  copy_graph();
+  probs_ = sim_.predict(t);
+
+  g_.wg_ = sim_.g_.wg_;
+  landmarks_.clear();
 
   std::vector<landmark_t> points = sim_.positions(t);
 
   for (size_t i = 0; i < points.size(); ++i) {
     landmark_t &p = points[i];
-    Edge e = boost::edge(vertices_.at(p.get<0>()),
-                         vertices_.at(p.get<1>()),
-                         g_copy_).first;
-    int s = boost::get(vnames_, boost::source(e, g_copy_));
+    Edge e = g_.wg_.e(p.get<0>(), p.get<1>());
+    int s = g_.wg_.vid(boost::source(e, g_.wg_()));
     std::vector<std::pair<int, double> > &vec =
-        landmarks_[boost::get(enames_, e)];
+        landmarks_[g_.wg_.eid(e)];
 
-    if (vec.empty())
-      vec.push_back({s, 0.0});
+    if (vec.empty()) vec.push_back({s, 0.0});
 
     vec.push_back({i, s == p.get<0>() ? p.get<2>() : 1 - p.get<2>()});
   }
 
-  int eid = boost::num_edges(g_copy_);
-  idbase_ = sim_.g_.OBJECTID;
+  {
+    int eid = g_.USEREDGE;
+    const int idbase_ = g_.OBJECTID;
 
-  for (auto i = landmarks_.begin(); i != landmarks_.end(); ++i) {
-    Edge e = edges_.at(i->first);
-    double w = get(weights_, e);
-    std::vector<std::pair<int, double> > &vec = i->second;
+    for (auto i = landmarks_.begin(); i != landmarks_.end(); ++i) {
+      Edge e = g_.wg_.e(i->first);
+      double w = get(w0_, e);
+      std::vector<std::pair<int, double> > &vec = i->second;
 
-    std::stable_sort(vec.begin(), vec.end(),
-                     [](const std::pair<int, double> &a,
-                        const std::pair<int, double> &b) {
-                       return a.second < b.second;
-                     });
+      std::stable_sort(vec.begin(), vec.end(),
+                       [](const std::pair<int, double> &a,
+                          const std::pair<int, double> &b) {
+                         return a.second < b.second;
+                       });
 
-    boost::remove_edge(e, g_copy_);
-    Vertex u = vertices_.at(vec.begin()->first);
+      boost::remove_edge(e, g_.wg_());
+      Vertex u = g_.wg_.v(vec.begin()->first);
 
-    for (auto j = std::next(vec.begin()); j != vec.end(); ++j, eid++) {
-      Vertex v = boost::add_vertex(idbase_ + j->first, g_copy_);
-      Edge t = boost::add_edge(u, v, eid, g_copy_).first;
-      put(weights_, t, w * (j->second - std::prev(j)->second));
-      u = v;
+      for (auto j = std::next(vec.begin()); j != vec.end(); ++j) {
+        Vertex v = g_.wg_.addv(idbase_ + j->first);
+        Edge t = g_.wg_.adde(u, v, eid++);
+        put(w0_, t, w * (j->second - std::prev(j)->second));
+        u = v;
+      }
+
+      // find the right `target'
+      Vertex v = g_.wg_.v(vec.begin()->first);
+      if (boost::target(e, g_.wg_()) == v)
+        v = boost::source(e, g_.wg_());
+      else v = boost::target(e, g_.wg_());
+
+      Edge t = g_.wg_.adde(u, v, eid++);
+      put(w0_, t, w * (1 - vec.back().second));
     }
+  }
 
-    // find the right `target'
-    Vertex v = vertices_.at(vec.begin()->first);
-    if (boost::target(e, sim_.g_()) == v)
-      v = boost::source(e, sim_.g_());
-    else v = boost::target(e, sim_.g_());
+  try {
+    Vertex v = g_.ag_.v(object_ + g_.OBJECTID);
+    boost::remove_vertex(v, g_.ag_());
+  } catch (...) { }
 
-    Edge t = boost::add_edge(u, v, eid, g_copy_).first;
-    put(weights_, t, w * (1 - vec.back().second));
+  {
+    int eid = g_.USEREDGE;
+
+    Vertex v = g_.ag_.addv(object_ + g_.OBJECTID),
+           s = g_.ag_.v(points[object_].get<0>()),
+           d = g_.ag_.v(points[object_].get<1>());
+
+    Edge e1 = g_.ag_.adde(s, v, eid++),
+         e2 = g_.ag_.adde(v, d, eid++);
+
+    double p = points[object_].get<2>();
+    put(w1_, e1, p);
+    put(w1_, e2, 1 - p);
   }
 }
 
@@ -194,15 +168,18 @@ struct found_nn {};
 class nearest_neighbor_visitor : public boost::default_dijkstra_visitor
 {
  public:
-  nearest_neighbor_visitor(int k, boost::unordered_set<int> &result)
-      : k_(k), result_(result) { }
+  nearest_neighbor_visitor(int k, boost::unordered_set<int> &result,
+                           int limit)
+      : k_(k), result_(result), limit_(limit) { }
 
   template <typename V, typename G>
   void
   discover_vertex(V v, const G &g)
   {
-    if (vnames_[v] >= idbase_) {
-      result_.insert(vnames_[v]);
+    int vid = g_.wg_.vid(v);
+    if (vid >= limit_) {
+      result_.insert(vid - limit_);
+
       if (--k_ == 0)
         throw found_nn();
     }
@@ -211,23 +188,68 @@ class nearest_neighbor_visitor : public boost::default_dijkstra_visitor
  private:
   int k_;
   boost::unordered_set<int> &result_;
+  int limit_;
 };
 
 boost::unordered_set<int>
 NearestNeighbor::query(int k)
 {
   boost::unordered_set<int> result;
-  nearest_neighbor_visitor vis(k, result);
-  boost::dijkstra_shortest_paths(
-      g_copy_, vertices_[object_],
-      boost::visitor(vis).weight_map(weights_));
+  nearest_neighbor_visitor vis(k, result, g_.OBJECTID);
+
+  try {
+    boost::dijkstra_shortest_paths(
+        g_.wg_(), g_.wg_.v(object_ + g_.OBJECTID),
+        boost::visitor(vis).weight_map(w0_));
+  } catch (found_nn) { }
+
   return result;
 }
+
+class nearest_neighbor_prob_visitor
+    : public boost::default_dijkstra_visitor
+{
+ public:
+  nearest_neighbor_prob_visitor(
+      int k, boost::unordered_map<int, double> &result)
+      : k_(k), result_(result), p_(0.0) { }
+
+  template <typename V, typename G>
+  void
+  discover_vertex(V v, const G &g)
+  {
+    int vid = g_.ag_.vid(v);
+    auto it = probs_.find(vid);
+
+    if (it != probs_.end()) {
+      boost::unordered_map<int, double> &objs = it->second;
+      for (auto i = objs.begin(); i != objs.end(); ++i) {
+        result_[i->first] += i->second;
+        p_ += i->second;
+      }
+      if (p_ >= k_)
+        throw found_nn();
+    }
+  }
+
+ private:
+  int k_;
+  boost::unordered_map<int, double> &result_;
+  int p_;
+};
 
 boost::unordered_map<int, double>
 NearestNeighbor::predict(int k)
 {
   boost::unordered_map<int, double> result;
+  nearest_neighbor_prob_visitor vis(k, result);
+
+  try {
+    boost::dijkstra_shortest_paths(
+        g_.ag_(), g_.ag_.v(object_ + g_.OBJECTID),
+        boost::visitor(vis).weight_map(w1_));
+  } catch (found_nn) { }
+
   return result;
 }
 
