@@ -14,21 +14,15 @@ namespace simulation {
 class Particle
 {
  public:
-  Particle(const WalkingGraph &g, int id, landmark_t pos = {0, 0, -1});
+  Particle(const WalkingGraph &g, int id = -1,
+           const landmark_t &pos = {0, 0, -1});
   Particle(const Particle &other);
 
   landmark_t
-  advance(const WalkingGraph &g, double duration = -1.0);
+  advance(double duration = -1.0);
 
   landmark_t
-  pos(const WalkingGraph &g, double t = -1) const;
-
-  static void
-  set_unit(double unit)
-  { unit_ = unit; }
-
-  static double
-  get_unit() { return unit_; }
+  pos(double t = -1) const;
 
   void
   print(std::ostream &os) const;
@@ -36,15 +30,18 @@ class Particle
   const int
   id() const { return id_; }
 
+  double
+  v() const { return velocity_; }
+
  private:
 
-  static double unit_;
+  const WalkingGraph &g_;
 
   const int id_;
-
   landmark_t pos_;
   double velocity_;
 
+  // <timestamp, nodeid>
   std::vector<std::pair<double, int> > history_;
 };
 
