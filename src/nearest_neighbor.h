@@ -28,9 +28,6 @@ class NearestNeighbor
   random_object();
 
  private:
-  void
-  copy_graph();
-
   Simulator &sim_;
 };
 
