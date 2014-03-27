@@ -226,16 +226,21 @@ class nearest_neighbor_prob_visitor
       for (auto i = objs.begin(); i != objs.end(); ++i) {
         result_[i->first] += i->second;
         p_ += i->second;
+        // cout << i->second << ' ';
       }
-      if (p_ >= k_)
+      // cout << endl;
+      // cout << p_ << '/' << k_ << ' ';
+      if (p_ >= k_) {
+        // cout << endl;
         throw found_nn();
+      }
     }
   }
 
  private:
   int k_;
   boost::unordered_map<int, double> &result_;
-  int p_;
+  double p_;
 };
 
 boost::unordered_map<int, double>
