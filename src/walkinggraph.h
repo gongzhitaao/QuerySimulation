@@ -49,8 +49,9 @@ struct EP {
 typedef boost::property<boost::vertex_name_t, int> VertexProperty;
 typedef boost::property<boost::edge_name_t, int> EdgeProperty;
 
-typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
-                              VertexProperty, EdgeProperty> UndirectedGraph;
+typedef boost::adjacency_list<
+  boost::vecS, boost::vecS, boost::undirectedS,
+  VertexProperty, EdgeProperty> UndirectedGraph;
 typedef boost::graph_traits<UndirectedGraph>::vertex_descriptor Vertex;
 typedef boost::graph_traits<UndirectedGraph>::edge_descriptor Edge;
 
@@ -70,6 +71,10 @@ class WalkingGraph
 
   enum { ANCHORID = 100, OBJECTID = 1000, USEREDGE = 10000};
 
+  // Convinient wrapper for boost::graph, including map between vertex
+  // descriptor and vertex name, edge descriptor and edge name.  This
+  // is not labeled graph, so we need an extra map from name to
+  // descriptor.
   class graph_
   {
    public:
@@ -144,18 +149,22 @@ class WalkingGraph
 
   WalkingGraph();
 
+  // set the enter room probability
   void
   enter_room(double p)
   { enter_room_ = p; }
 
+  // set the knock door probability
   void
   knock_door(double p)
   { knock_door_ = p; }
 
+  // get the coordinate of a vertex by its name
   Point_2
   coord(int v) const
   { return vp_.at(v).coord; }
 
+  // get the coordinate of a landmark
   Point_2
   coord(const landmark_t &pos) const
   {
@@ -164,45 +173,55 @@ class WalkingGraph
                               pos.get<2>());
   }
 
+  // Get the weight of and edge
   double
   weight(int u, int v) const
   { return ep_.at(wg_.eid(wg_.e(u, v))).weight; }
 
+  // Get the color of a vertex, HALL, DOOR or ROOM.
   vertex_color_enum
   color(int v) const
   { return vp_.at(v).color; }
 
+  // Generate a random vertex name in walking graph
   template <typename Generator>
   int
   random_vertex(Generator gen) const
   { return wg_.vid(boost::random_vertex(wg_(), gen)); }
 
+  // Given current vertex and where we were, generate a random next
+  // step.
   int
   random_next(int to, int from = -1) const;
 
+  // Generate a random position along the walking graph.
   landmark_t
   random_pos() const;
 
+  // Generate a random position inside a reader
   landmark_t
   reader_pos(int i) const { return readermap_.at(i); }
 
+  // Given a window ratio, generate a random window and intersect the
+  // window with the hall way and room.  Each newly generated window
+  // is associated with a probability.
   std::vector<std::pair<IsoRect_2, double> >
   random_window(double ratio) const;
 
+  // Find out the index of the reader the landmark is in.
   int
   detected_by(const landmark_t &pos, double radius);
 
+  // Align a landmark, align it to the nearest anchor point.
   int
   align(const landmark_t &p);
 
-
+  // Get all the anchors with a rect.
   std::vector<int>
   anchors_in_win(const IsoRect_2 &w);
 
-  // const UndirectedGraph &
-  // operator () ()
-  // { return wg_; }
-
+  // Print information about the walking graph.  This is more of a
+  // debugging helper.
   void
   print(std::ostream &os) const;
 
@@ -210,6 +229,7 @@ class WalkingGraph
   void
   initialize();
 
+  // Insert anchors into the walking graph.
   void
   insert_anchors(double unit = 20.0);
 

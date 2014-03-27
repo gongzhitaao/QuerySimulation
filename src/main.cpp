@@ -106,11 +106,54 @@ test_range_query()
 
   cout << boost::accumulators::mean(acc) << ' '
        << boost::accumulators::variance(acc) << endl;
-
 }
 
 void
 test_knn()
+{
+  const double DURATION = 200;
+  const int NUM_TIMESTAMP = 100;
+  const int MAX_K = 50;
+
+  typedef boost::accumulators::accumulator_set<
+    double, boost::accumulators::features<
+      boost::accumulators::tag::mean,
+              boost::accumulators::tag::variance> > accumulators;
+
+  using namespace simulation::param;
+  simulation::Simulator sim(_num_object=200);
+
+  sim.run(DURATION);
+
+  simulation::NearestNeighbor nn(sim);
+
+  accumulators acc[MAX_K];
+  boost::random::uniform_real_distribution<>
+      unifd(DURATION / 4.0, DURATION * 3.0 / 4.0);
+
+  for (int ts = 0; ts < NUM_TIMESTAMP; ++ts) {
+
+    nn.random_object();
+
+    nn.prepare(unifd(gen));
+
+    for (int k = 1; k <= MAX_K; ++k) {
+      boost::unordered_set<int> real = nn.query(k);
+      boost::unordered_map<int, double> fake = nn.predict(k);
+      acc[k-1](recall(real, fake));
+    }
+    cout << ts << '/' << NUM_TIMESTAMP << endl;
+  }
+
+  std::ofstream fout("data.txt");
+  for (int i = 0; i < MAX_K; ++i)
+    fout << boost::accumulators::mean(acc[i]) << ' '
+         << boost::accumulators::variance(acc[i]) << endl;
+  fout.close();
+}
+
+void
+test_threshold()
 {
   const double DURATION = 200;
   const int NUM_TIMESTAMP = 100;
@@ -127,7 +170,7 @@ test_knn()
 
   simulation::NearestNeighbor nn(sim);
 
-  accumulators acc;
+  accumulators acc0, acc1;
   boost::random::uniform_real_distribution<>
       unifd(DURATION / 4.0, DURATION * 3.0 / 4.0);
 
@@ -137,20 +180,138 @@ test_knn()
 
     nn.prepare(unifd(gen));
 
-    boost::unordered_set<int> real = nn.query(50);
-    boost::unordered_map<int, double> fake = nn.predict(50);
+    boost::unordered_set<int> real = nn.query(3);
+    boost::unordered_map<int, double> fake = nn.predict(3);
 
-    acc(recall(real, fake));
+    for (auto i = fake.begin(); i != fake.end(); ++i) {
+      if (real.find(i->first) != real.end())
+        acc0(i->second);
+      else
+        acc1(i->second);
+    }
+
     cout << ts << '/' << NUM_TIMESTAMP << endl;
   }
 
-  cout << boost::accumulators::mean(acc) << ' '
-       << boost::accumulators::variance(acc) << endl;
+  cout << boost::accumulators::mean(acc0) << ' '
+       << boost::accumulators::variance(acc0) << endl;
 
+  cout << boost::accumulators::mean(acc1) << ' '
+       << boost::accumulators::variance(acc1) << endl;
+}
+
+void
+test_range_query_cont()
+{
+  const double DURATION = 200;
+  const int MAX_TIMESTAMP = 50;
+  const int NUM_TEST = 100;
+
+  typedef boost::accumulators::accumulator_set<
+    double, boost::accumulators::features<
+      boost::accumulators::tag::mean,
+              boost::accumulators::tag::variance> > accumulators;
+
+  using namespace simulation::param;
+  simulation::Simulator sim(_num_object=200);
+
+  sim.run(DURATION);
+
+  simulation::RangeQuery rq(sim);
+
+  accumulators acc[MAX_TIMESTAMP];
+  double time = DURATION - MAX_TIMESTAMP;
+  boost::random::uniform_real_distribution<>
+      unifd(time / 2.0, time);
+
+  while (true) {
+    if (rq.random_window(0.01))
+      break;
+  }
+
+  for (int test = 0; test < NUM_TEST; ++test) {
+
+    double start = unifd(gen);
+    boost::unordered_set<int> back;
+    for (int ts = 0; ts < MAX_TIMESTAMP; ++ts) {
+
+      rq.prepare(start + ts);
+      boost::unordered_set<int> real = rq.query();
+
+      if (real.empty() || real == back)
+        continue;
+
+      boost::unordered_map<int, double> fake = rq.predict();
+
+      acc[ts](recall(real, fake));
+
+      back = real;
+    }
+    cout << test << '/' << NUM_TEST << endl;
+  }
+
+  std::ofstream fout("data.txt");
+  for (int i = 0; i < MAX_TIMESTAMP; ++i)
+    fout << boost::accumulators::mean(acc[i]) << ' '
+         << boost::accumulators::variance(acc[i]) << endl;
+  fout.close();
+}
+
+void
+test_knn_cont()
+{
+  const double DURATION = 200;
+  const int MAX_TIMESTAMP = 50;
+  const int NUM_TEST = 100;
+
+  typedef boost::accumulators::accumulator_set<
+    double, boost::accumulators::features<
+      boost::accumulators::tag::mean,
+              boost::accumulators::tag::variance> > accumulators;
+
+  using namespace simulation::param;
+  simulation::Simulator sim(_num_object=200);
+
+  sim.run(DURATION);
+
+  simulation::NearestNeighbor nn(sim);
+
+  accumulators acc[NUM_TEST];
+  double time = DURATION - MAX_TIMESTAMP;
+  boost::random::uniform_real_distribution<>
+      unifd(time / 2.0, time);
+
+  for (int test = 0; test < NUM_TEST; ++test) {
+
+    double start = unifd(gen);
+    nn.random_object();
+    boost::unordered_set<int> back;
+
+    for (int ts = 0; ts < MAX_TIMESTAMP; ++ts) {
+
+      nn.prepare(start + ts);
+
+      boost::unordered_set<int> real = nn.query(5);
+      boost::unordered_map<int, double> fake = nn.predict(5);
+
+      if (real != back) {
+        acc[ts](recall(real, fake));
+        back = real;
+      }
+    }
+
+    cout << test << '/' << NUM_TEST << endl;
+  }
+
+  std::ofstream fout("data.txt");
+  for (int i = 0; i < MAX_TIMESTAMP; ++i)
+    fout << boost::accumulators::mean(acc[i]) << ' '
+         << boost::accumulators::variance(acc[i]) << endl;
+  fout.close();
 }
 
 int main()
 {
-  test_knn();
+  test_knn_cont();
   return 0;
 }

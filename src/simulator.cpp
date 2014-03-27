@@ -161,8 +161,8 @@ Simulator_impl_::predict_(
   // unknown, which is exactly what we'd like to predict.
   double remain = t - end;
   double prob = 1.0 / num_particle_;
-  for (auto it = subparticles.begin();
-       it != subparticles.end(); ++it) {
+  for (auto it = subparticles.begin(); it != subparticles.end();
+       ++it) {
     landmark_t p = it->advance(remain);
     out[g_.align(p)][it->id()] += prob;
   }
