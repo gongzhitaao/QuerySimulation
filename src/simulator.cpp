@@ -59,6 +59,18 @@ Simulator_impl_::predict(double t)
   return result;
 }
 
+boost::unordered_map<int, boost::unordered_map<int, double> >
+Simulator_impl_::predict1(double t)
+{
+  boost::unordered_map<
+    int, boost::unordered_map<int, double> > result;
+
+  for (int i = 0; i < num_object_; ++i)
+    predict1_(result, i, t);
+
+  return result;
+}
+
 landmark_t
 Simulator_impl_::random_inside_reader(int i) const
 {
@@ -93,7 +105,6 @@ Simulator_impl_::run(double duration)
       if (unifd(gen) > success_rate_) tmp.push_back(-1);
       else tmp.push_back(g_.detected_by(objects_[i].pos(j), radius_));
     }
-
     readings_.push_back(tmp);
   }
 }
@@ -141,7 +152,8 @@ Simulator_impl_::predict_(
       landmark_t p = it->advance();
       if (reading[i] >= 0 && g_.detected_by(p, radius_) != reading[i])
         it = subparticles.erase(it);
-      else ++it;
+      else
+        ++it;
     }
 
     int sz = subparticles.size();
@@ -160,13 +172,21 @@ Simulator_impl_::predict_(
   // Predicting.  During the *remain*, the object's position is
   // unknown, which is exactly what we'd like to predict.
   double remain = t - end;
+
   double prob = 1.0 / num_particle_;
   for (auto it = subparticles.begin(); it != subparticles.end();
        ++it) {
     landmark_t p = it->advance(remain);
     out[g_.align(p)][it->id()] += prob;
   }
+  return true;
+}
 
+bool
+Simulator_impl_::predict1_(
+    boost::unordered_map<int, boost::unordered_map<int, double> > &out,
+    int obj, double t, int limit)
+{
   return true;
 }
 

@@ -19,7 +19,7 @@ class RangeQuery
   void
   prepare(double t);
 
-  boost::unordered_set<int>
+  boost::unordered_map<int, double>
   query();
 
   boost::unordered_map<int, double>

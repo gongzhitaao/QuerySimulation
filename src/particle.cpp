@@ -18,7 +18,7 @@ Particle::Particle(const WalkingGraph &g, int id,
     : g_(g)
     , id_(id)
 {
-  boost::random::normal_distribution<> norm(80, 10);
+  boost::random::normal_distribution<> norm(120, 10);
   velocity_ = norm(gen);
 
   pos_ = pos.get<2>() < 0 ? g.random_pos() : pos;
@@ -35,7 +35,7 @@ Particle::Particle(const Particle &other)
     , pos_(other.pos_)
     , history_(other.history_)
 {
-  boost::random::normal_distribution<> norm(other.velocity_, 5);
+  boost::random::normal_distribution<> norm(other.velocity_, 10);
   velocity_ = norm(gen);
 }
 
@@ -48,9 +48,11 @@ Particle::advance(double duration)
 
   double w = g_.weight(source, target);
   double elapsed = history_.back().first + w * p / velocity_,
-            left = w * (1 - p),
-            dist = duration <= 0 ? velocity_ - left
-                   : duration * velocity_ - left;
+      left = w * (1 - p),
+      dist = duration <= 0 ? velocity_ - left
+      : duration * velocity_ - left;
+
+  boost::random::uniform_real_distribution<> unifd(0, 1);
 
   while (true) {
     elapsed += left / velocity_;
@@ -62,6 +64,7 @@ Particle::advance(double duration)
     source = target;
     target = g_.random_next(source, pre);
     left = g_.weight(source, target);
+
     dist -= left;
   }
 
@@ -85,7 +88,7 @@ Particle::pos(double t) const
 
     if (history_.cend() == cur) {
       double left = (t - history_.back().first) * velocity_,
-                w = g_.weight(source, target);
+          w = g_.weight(source, target);
 
       if (left > p * w) {
         source = target = history_.back().second;

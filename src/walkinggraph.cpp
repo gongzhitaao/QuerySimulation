@@ -295,45 +295,62 @@ WalkingGraph::insert_anchors(double unit)
 int
 WalkingGraph::random_next(int to, int from) const
 {
+  if (color(from) == ROOM) {
+    boost::random::uniform_real_distribution<> unifd(0, 1);
+    if (unifd(gen) > .2)
+      return from;
+  }
+
   Vertex cur = wg_.v(to);
   Vertex pre = from < 0 ? wg_().null_vertex() : wg_.v(from);
 
-  boost::unordered_set<Vertex> hall, door, room;
-
+  boost::unordered_set<Vertex> outs;
   auto pit = boost::out_edges(cur, wg_());
-  for (auto it = pit.first; it != pit.second; ++it) {
-    Vertex v = boost::target(*it, wg_());
-    switch (color(wg_.vid(v))) {
-      case HALL: hall.insert(v); break;
-      case DOOR: door.insert(v); break;
-      case ROOM: room.insert(v); break;
-      default: break;
-    }
-  }
+  for (auto it = pit.first; it != pit.second; ++it)
+    outs.insert(boost::target(*it, wg_()));
 
-  if (hall.size() == 0 || wg_().null_vertex() == pre) {
-    if (hall.size() > 0) {
-      boost::random::uniform_int_distribution<>
-          unifi(0, hall.size() - 1);
-      return wg_.vid(*boost::next(hall.begin(), unifi(gen)));
-    }
-    return wg_.vid(*door.begin());
-  }
+  if (outs.size() > 1)
+    outs.erase(pre);
 
-  boost::random::uniform_real_distribution<> unifd(0, 1);
+  boost::random::uniform_int_distribution<> unifi(0, outs.size() - 1);
+  return wg_.vid(*boost::next(outs.begin(), unifi(gen)));
 
-  if (room.size() > 0 && color(wg_.vid(pre)) != ROOM &&
-      unifd(gen) < enter_room_)
-    return wg_.vid(*room.begin());
+  // boost::unordered_set<Vertex> hall, door, room;
 
-  if (door.size() > 0 && (color(wg_.vid(cur)) == ROOM ||
-                          unifd(gen) < knock_door_))
-    return wg_.vid(*door.begin());
+  // auto pit = boost::out_edges(cur, wg_());
+  // for (auto it = pit.first; it != pit.second; ++it) {
+  //   Vertex v = boost::target(*it, wg_());
+  //   switch (color(wg_.vid(v))) {
+  //     case HALL: hall.insert(v); break;
+  //     case DOOR: door.insert(v); break;
+  //     case ROOM: room.insert(v); break;
+  //     default: break;
+  //   }
+  // }
 
-  if (hall.size() > 1) hall.erase(pre);
+  // if (hall.size() == 0 || wg_().null_vertex() == pre) {
+  //   if (hall.size() > 0) {
+  //     boost::random::uniform_int_distribution<>
+  //         unifi(0, hall.size() - 1);
+  //     return wg_.vid(*boost::next(hall.begin(), unifi(gen)));
+  //   }
+  //   return wg_.vid(*door.begin());
+  // }
 
-  boost::random::uniform_int_distribution<> unifi(0, hall.size() - 1);
-  return wg_.vid(*boost::next(hall.begin(), unifi(gen)));
+  // boost::random::uniform_real_distribution<> unifd(0, 1);
+
+  // if (room.size() > 0 && color(wg_.vid(pre)) != ROOM &&
+  //     unifd(gen) < enter_room_)
+  //   return wg_.vid(*room.begin());
+
+  // if (door.size() > 0 && (color(wg_.vid(cur)) == ROOM ||
+  //                         unifd(gen) < knock_door_))
+  //   return wg_.vid(*door.begin());
+
+  // if (hall.size() > 1) hall.erase(pre);
+
+  // boost::random::uniform_int_distribution<> unifi(0, hall.size() - 1);
+  // return wg_.vid(*boost::next(hall.begin(), unifi(gen)));
 }
 
 landmark_t
@@ -346,18 +363,52 @@ WalkingGraph::random_pos() const
                            unifd(gen));
 }
 
-std::vector<std::pair<IsoRect_2, double> >
-WalkingGraph::random_window(double ratio) const
+IsoRect_2
+WalkingGraph::random_window_aux(double ratio) const
 {
+  /* METHOD 1: Ramdom rectangular window */
   double r = 1 - std::sqrt(ratio);
   boost::random::uniform_real_distribution<>
       unifx(0, xmax_ * r), unify(0, ymax_ * r);
-
   double xmin = unifx(gen), ymin = unify(gen);
 
-  IsoRect_2 win = IsoRect_2(xmin, ymin,
-                            xmin + xmax_ * (1 - r),
-                            ymin + ymax_ * (1 - r));
+  return IsoRect_2(xmin, ymin, xmin + xmax_ * (1 - r),
+                   ymin + ymax_ * (1 - r));
+
+  /* METHOD 2: Random square window with center fixed on edges. */
+  // double r = std::sqrt(xmax_ * ymax_ * ratio) / 2.0;
+
+  // Edge e = boost::random_edge(wg_(), gen);
+  // boost::random::uniform_real_distribution<> unifd(0, 1);
+  // Point_2 center = linear_interpolate(
+  //     coord(wg_.vid(boost::source(e, wg_()))),
+  //     coord(wg_.vid(boost::target(e, wg_()))),
+  //     unifd(gen));
+
+  // return IsoRect_2(center.x() - r, center.y() - r, center.x() + r,
+  //                  center.y() + r);
+
+  /* METHOD 3: Fix query window in the hall way. */
+  // boost::random::uniform_int_distribution<>
+  //     unifi(0, halls_.size() - 1);
+  // IsoRect_2 hall = halls_[unifi(gen)];
+
+  // double r = std::sqrt(ratio),
+  //     rx = r * (hall.xmax() - hall.xmin()),
+  //     ry = r * (hall.ymax() - hall.ymin());
+  // boost::random::uniform_int_distribution<>
+  //     unifx(hall.xmin(), hall.xmax() - rx),
+  //     unify(hall.ymin(), hall.ymax() - ry);
+
+  // double x = unifx(gen), y = unify(gen);
+
+  // return IsoRect_2(x, y, x + rx, y + ry);
+}
+
+std::vector<std::pair<IsoRect_2, double> >
+WalkingGraph::random_window(double ratio) const
+{
+  IsoRect_2 win = random_window_aux(ratio);
 
   std::vector<std::pair<IsoRect_2, double> > results;
 
@@ -383,7 +434,7 @@ WalkingGraph::random_window(double ratio) const
         results.push_back(std::make_pair(
             IsoRect_2(Point_2(tmp.xmin(), hall.ymin()),
                       Point_2(tmp.xmax(), hall.ymax())),
-            (tmp.ymax() - tmp.ymin()) / (hall.ymax() - hall.ymax())));
+            (tmp.ymax() - tmp.ymin()) / (hall.ymax() - hall.ymin())));
       else
         results.push_back(std::make_pair(
             IsoRect_2(Point_2(hall.xmin(), tmp.ymin()),

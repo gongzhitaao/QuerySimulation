@@ -48,7 +48,10 @@ class Simulator_impl_
   boost::unordered_map<int, boost::unordered_map<int, double> >
   predict(double t);
 
- protected:
+  boost::unordered_map<int, boost::unordered_map<int, double> >
+  predict1(double t);
+
+  // protected:
 
   Simulator_impl_() {}
 
@@ -60,7 +63,6 @@ class Simulator_impl_
       , unit_(args[param::_unit | 20])
       , knock_door_prob_(args[param::_knock_door_prob | 0.1])
       , enter_room_prob_(args[param::_enter_room_prob | 0.1])
-      , threshold_(args[param::_threshold | 0.4])
       , success_rate_(args[param::_success_rate | 0.95])
   {
     initialize();
@@ -77,6 +79,11 @@ class Simulator_impl_
            int, boost::unordered_map<int, double> > &out,
            int obj, double t, int limit = 2);
 
+  bool
+  predict1_(boost::unordered_map<
+            int, boost::unordered_map<int, double> > &out,
+            int obj, double t, int limit = 2);
+
   // system parameters
   int num_object_;
   int num_particle_;
@@ -84,7 +91,6 @@ class Simulator_impl_
   double unit_;
   double knock_door_prob_;
   double enter_room_prob_;
-  double threshold_;
   double success_rate_;
 
   WalkingGraph g_;
@@ -105,8 +111,7 @@ class Simulator : public Simulator_impl_
        (radius, *)
        (unit, *)
        (knock_door_prob, *)
-       (enter_room_prob, *)
-       (threshold, *)))
+       (enter_room_prob, *)))
 };
 
 }

@@ -80,7 +80,8 @@ NearestNeighbor::NearestNeighbor(Simulator &sim)
 void
 NearestNeighbor::random_object()
 {
-  boost::random::uniform_int_distribution<> unifd(0, sim_.num_object_ - 1);
+  boost::random::uniform_int_distribution<>
+      unifd(0, sim_.num_object_ - 1);
   object_ = unifd(gen);
 }
 
@@ -165,11 +166,12 @@ NearestNeighbor::prepare(double t)
 
 struct found_nn {};
 
-class nearest_neighbor_visitor : public boost::default_dijkstra_visitor
+class nearest_neighbor_visitor :
+      public boost::default_dijkstra_visitor
 {
  public:
-  nearest_neighbor_visitor(int k, boost::unordered_set<int> &result,
-                           int limit)
+  nearest_neighbor_visitor(
+      int k, boost::unordered_map<int, double> &result, int limit)
       : k_(k), result_(result), limit_(limit) { }
 
   template <typename V, typename G>
@@ -178,7 +180,7 @@ class nearest_neighbor_visitor : public boost::default_dijkstra_visitor
   {
     int vid = g_.wg_.vid(v);
     if (vid >= limit_) {
-      result_.insert(vid - limit_);
+      result_[vid - limit_] = 1.0;
 
       if (--k_ == 0)
         throw found_nn();
@@ -187,14 +189,14 @@ class nearest_neighbor_visitor : public boost::default_dijkstra_visitor
 
  private:
   int k_;
-  boost::unordered_set<int> &result_;
+  boost::unordered_map<int, double> &result_;
   int limit_;
 };
 
-boost::unordered_set<int>
+boost::unordered_map<int, double>
 NearestNeighbor::query(int k)
 {
-  boost::unordered_set<int> result;
+  boost::unordered_map<int, double> result;
   nearest_neighbor_visitor vis(k, result, g_.OBJECTID);
 
   try {
@@ -226,14 +228,10 @@ class nearest_neighbor_prob_visitor
       for (auto i = objs.begin(); i != objs.end(); ++i) {
         result_[i->first] += i->second;
         p_ += i->second;
-        // cout << i->second << ' ';
       }
-      // cout << endl;
-      // cout << p_ << '/' << k_ << ' ';
-      if (p_ >= k_) {
-        // cout << endl;
+
+      if (p_ >= k_)
         throw found_nn();
-      }
     }
   }
 

@@ -33,6 +33,15 @@ TEST_F(SimulationTest, walkinggraph)
        << boost::edge(g_copy.wg_.v(s), g_copy.wg_.v(d), g_copy.wg_()).second << endl;
 }
 
+TEST_F(SimulationTest, random_win)
+{
+  std::vector<std::pair<simulation::IsoRect_2, double> > res = g.random_window(0.1);
+  std::ofstream fout("win.txt", ios::app);
+  for (auto i = res.begin(); i != res.end(); ++i)
+    fout << i->first << ' ' << i->second << std::endl;
+  fout.close();
+}
+
 TEST_F(SimulationTest, particle_advance)
 {
   simulation::Particle p(g, -1);
@@ -50,11 +59,14 @@ TEST_F(SimulationTest, particle_pos)
 
 TEST_F(SimulationTest, random_pos)
 {
-  for (int i = 0; i < 100; ++i) {
-    simulation::landmark_t pos = g.random_pos();
-    cout << pos.get<0>() << ' ' << pos.get<1>() << endl;
-    cout << g.weight(pos.get<0>(), pos.get<1>()) << endl;
-  }
+  using namespace simulation::param;
+  simulation::Simulator sim(_num_object=1);
+
+  ofstream fout("pos3.txt");
+  fout << g.coord(g.reader_pos(14)) << endl;
+  for (int i = 0; i < 10; ++i)
+    fout << g.coord(sim.random_inside_reader(14)) << endl;
+  fout.close();
 }
 
 TEST_F(SimulationTest, range_query)
@@ -72,7 +84,7 @@ TEST_F(SimulationTest, range_query)
   }
 
   rq.prepare(100);
-  boost::unordered_set<int> real = rq.query();
+  boost::unordered_map<int, double> real = rq.query();
   boost::unordered_map<int, double> fake = rq.predict();
 }
 
@@ -88,8 +100,22 @@ TEST_F(SimulationTest, knn)
   nn.prepare(10.0);
 }
 
+TEST_F(SimulationTest, pf)
+{
+  const double DURATION = 200.0;
+
+  using namespace simulation::param;
+  simulation::Simulator sim(_num_object=200);
+
+  sim.run(DURATION);
+  boost::random::uniform_real_distribution<>
+      unifd(DURATION / 4.0, DURATION * 3.0 / 4.0);
+
+  sim.predict(unifd(gen));
+}
+
 int main(int argc, char** argv) {
-  ::testing::GTEST_FLAG(filter) = "*knn";
+  ::testing::GTEST_FLAG(filter) = "*random_win";
   // This allows the user to override the flag on the command line.
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

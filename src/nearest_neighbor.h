@@ -18,7 +18,7 @@ class NearestNeighbor
   void
   prepare(double t);
 
-  boost::unordered_set<int>
+  boost::unordered_map<int, double>
   query(int k);
 
   boost::unordered_map<int, double>
