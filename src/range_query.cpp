@@ -99,22 +99,19 @@ RangeQuery::prepare(double t)
                                                  infos.end())));
 }
 
-boost::unordered_set<int>
+boost::unordered_map<int, double>
 RangeQuery::query()
 {
-  std::vector<vertex_handle> tmp;
-
+  boost::unordered_map<int, double> result;
   for (auto w = wins_.begin(); w != wins_.end(); ++w) {
+    std::vector<vertex_handle> tmp;
     objectset_.range_search(w->first.vertex(0), w->first.vertex(1),
                             w->first.vertex(2), w->first.vertex(3),
                             std::back_inserter(tmp));
+    for (auto it = tmp.begin(); it != tmp.end(); ++it)
+      result[(*it)->info()] = w->second;
   }
-
-  std::vector<int> result;
-  std::transform(tmp.begin(), tmp.end(), std::back_inserter(result),
-                 [](const vertex_handle vh) {
-                   return vh->info(); });
-  return boost::unordered_set<int>(result.begin(), result.end());
+  return result;
 }
 
 boost::unordered_map<int, double>

@@ -233,6 +233,9 @@ class WalkingGraph
   void
   insert_anchors(double unit = 20.0);
 
+  // Generate a random window
+  IsoRect_2 random_window_aux(double ratio) const;
+
   // walkinggraph, anchorgraph
   graph_ wg_, ag_;
 
